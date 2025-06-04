@@ -14,6 +14,7 @@ import java.util.Optional;
 
 public interface BillRepository extends JpaRepository<Bill, Integer> {
     Optional<List<Bill>> findAllByUserId(Integer userId);
+    List<Bill> findAllByReferenceNumber(String referenceNumber);
 
     @Query("SELECT NEW com.gsc.gsc.bill.dto.GetBillsDTO(b.id, b.referenceNumber, b.userId, " +
             "bst.name, bs.code, b.createdBy, b.total, b.discount, b.createdAt, " +
@@ -27,7 +28,7 @@ public interface BillRepository extends JpaRepository<Bill, Integer> {
             "LEFT JOIN BillTypeText btt ON btt.billTypeId = bt.id " +
             "LEFT JOIN CBillsStatusText bst ON bs.id = bst.billStatusId " +
             "LEFT JOIN Lang l ON l.id = bst.langId " +
-            "WHERE b.userId = :userId AND bst.langId = :langId AND btt.langId = :langId")
+            "WHERE b.userId = :userId AND bst.langId = :langId AND btt.langId = :langId ORDER BY b.createdAt DESC")
     Optional<List<GetBillsDTO>> findAllByUserIdAndLangId(Integer userId, Integer langId);
 
 
@@ -44,7 +45,7 @@ public interface BillRepository extends JpaRepository<Bill, Integer> {
             "JOIN BillTypeText btt on btt.billTypeId = bt.id " +
             "JOIN CBillsStatusText bst on bs.id = bst.billStatusId " +
             "JOIN Lang l on l.id = bst.langId " +
-            "WHERE bst.langId = :langId AND btt.langId = :langId")
+            "WHERE bst.langId = :langId AND btt.langId = :langId ORDER BY b.createdAt DESC")
     Page<GetBillsDTO> findAllByLangId(Integer langId, Pageable pageable);
     @Query("SELECT NEW com.gsc.gsc.bill.dto.GetBillsDTO(b.id, b.referenceNumber, b.userId, " +
             "bst.name, bs.code, b.createdBy, b.total, b.discount, b.createdAt, " +
@@ -58,7 +59,7 @@ public interface BillRepository extends JpaRepository<Bill, Integer> {
             "JOIN BillTypeText btt on btt.billTypeId = bt.id " +
             "JOIN CBillsStatusText bst on bs.id = bst.billStatusId " +
             "JOIN Lang l on l.id = bst.langId " +
-            "WHERE bst.langId = :langId AND btt.langId = :langId AND b.userId =:userId")
+            "WHERE bst.langId = :langId AND btt.langId = :langId AND b.userId =:userId ORDER BY b.createdAt DESC")
     Page<GetBillsDTO> findAllByLangIdAndUserId(Integer langId, Integer userId ,Pageable pageable);
 
 

@@ -14,6 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 public class AddBillDTO {
     Integer userId;
+    String userName;
     List<ProductBillDTO> productBillDTOList;
     List<OtherProductDTO> otherProductsDTOList;
     Double total;

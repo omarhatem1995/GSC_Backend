@@ -20,6 +20,7 @@ public class ProductBillDTO {
     private Integer quantity;
     private Integer productId;
     private String imageUrl;
+    private String productName;
     private Integer createdBy;
 
     public ProductBillDTO(BillProduct billProduct) {
@@ -28,5 +29,6 @@ public class ProductBillDTO {
         this.price = billProduct.getPrice();
         this.id = billProduct.getBillId();
         this.quantity = billProduct.getQuantity();
+        this.productName = billProduct.getName();
     }
 }

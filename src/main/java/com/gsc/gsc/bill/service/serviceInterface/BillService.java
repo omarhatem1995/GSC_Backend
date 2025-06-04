@@ -24,6 +24,7 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.*;
 
 import static com.gsc.gsc.bill.BillConstants.NOT_PAID;
+import static com.gsc.gsc.bill.BillConstants.PAID;
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 import static com.gsc.gsc.constants.UserTypes.USER_TYPE;
 
@@ -63,6 +64,8 @@ public class BillService implements IBillService {
     private JobCardRepository jobCardRepository;
     @Autowired
     private JobCardProductRepository jobCardProductRepository;
+    @Autowired
+    private ProductImagesRepository productImagesRepository;
 
     @Override
     public Optional<Car> getById(Integer id) {
@@ -299,6 +302,35 @@ public class BillService implements IBillService {
         }
     }
 
+    public ResponseEntity<?> updateBillStatus(String token, Integer billId){
+        Integer userId = getUserIdFromToken(token);
+        User user = userRepository.findUserById(userId);
+        Optional<Bill> existingBillOptional = billRepository.findById(billId);
+        ReturnObject returnObject = new ReturnObject();
+        if(user.getAccountTypeId().equals(ADMIN_TYPE)){
+            if(existingBillOptional.isPresent()){
+                Bill bill = existingBillOptional.get();
+                bill.setStatusId(PAID);
+                billRepository.save(bill);
+                returnObject.setData(bill);
+                returnObject.setStatus(false);
+                returnObject.setMessage("Updated Successfully");
+                return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+            }else{
+                returnObject.setData(null);
+                returnObject.setStatus(false);
+                returnObject.setMessage("No Bill Found");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+            }
+        }else{
+                returnObject.setData(null);
+                returnObject.setStatus(false);
+                returnObject.setMessage("This user isn't Authorized to update bills");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+        }
+
+    }
+
     public ResponseEntity<?> updateBillByAdmin(String token, AddBillDTO addBillDTO, Integer billId) {
         Integer userId = getUserIdFromToken(token);
         User user = userRepository.findUserById(userId);
@@ -349,6 +381,7 @@ public class BillService implements IBillService {
                 BillProduct billProduct = new BillProduct();
                 billProduct.setBillId(existingBill.getId());
                 billProduct.setProductId(null);
+                System.out.println("ProductQuantity : " + addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
                 billProduct.setQuantity(addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
                 billProduct.setPrice(Double.valueOf(addBillDTO.getOtherProductsDTOList().get(i).getPrice()));
                 billProduct.setName(addBillDTO.getOtherProductsDTOList().get(i).getProductName());
@@ -399,6 +432,13 @@ public class BillService implements IBillService {
                 }
             } else {
                 newReferenceNumber = "U" + userId + "B1";
+            }
+            List<Bill> allBillsByReferenceNumber = billRepository.findAllByReferenceNumber(newReferenceNumber);
+            if(!allBillsByReferenceNumber.isEmpty()){
+                returnObject.setData(null);
+                returnObject.setStatus(false);
+                returnObject.setMessage("Bill with same reference Number Already Created");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
             }
             bill.setReferenceNumber(newReferenceNumber);
             bill.setStatusId(1);
@@ -455,226 +495,242 @@ public class BillService implements IBillService {
         }
     }
 
-    @Override
-    public ResponseEntity update(String token, Integer id, CarDTO dto) {
-        return null;
-    }
-
-    @Override
-    public ResponseEntity delete(Integer id) {
-        return null;
-    }
-
-    public Integer getUserIdFromToken(String token) {
-
-        Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
-        String userIdString = claims.getSubject();
-        System.out.println("getProperty " + token + " ,  " + userIdString);
-        return Integer.parseInt(userIdString);
-    }
-
-    public ResponseEntity getBillsForAdminByTokenForUserId(String token, int langId, Integer userId, Pageable pageable) {
-        Integer userAdminId = getUserIdFromToken(token);
-        User userAdmin = userRepository.findUserById(userAdminId);
-        ReturnObjectPaging returnObject = new ReturnObjectPaging();
-
-        if (userAdmin.getAccountTypeId() == ADMIN_TYPE) {
-            Page<GetBillsDTO> billsPage = billRepository.findAllByLangIdAndUserId(langId, userId, pageable);
-            Long countOfAllBills = billsPage.getTotalElements();
-            returnObject.setTotalPages(billsPage.getTotalPages());
-            returnObject.setTotalCount(billsPage.getTotalElements());
-            if (billsPage.isEmpty()) {
-                returnObject.setMessage("No Bills Found");
-                returnObject.setStatus(false);
-                returnObject.setData(new ArrayList<>());
-                return ResponseEntity.status(HttpStatus.OK).body(returnObject);
-            } else {
-                returnObject.setMessage(countOfAllBills + " Bills Loaded Successfully");
-                returnObject.setData(billsPage.getContent());
-                returnObject.setStatus(true);
-                return ResponseEntity.ok(returnObject);
-            }
-        } else {
-            returnObject.setMessage("Un Authorized");
-            returnObject.setStatus(false);
-            returnObject.setData(null);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        @Override
+        public ResponseEntity update (String token, Integer id, CarDTO dto){
+            return null;
         }
 
-    }
+        @Override
+        public ResponseEntity delete (Integer id){
+            return null;
+        }
 
-    public ResponseEntity<?> changeBillStatus(String token, Integer billId, BillStatusDTO billStatusDTO) {
-        ReturnObject returnObject = new ReturnObject();
-        if (token != null) {
-            Integer userIdFromToken = getUserIdFromToken(token);
-            if (userRepository.findUserById(userIdFromToken).getAccountTypeId() == ADMIN_TYPE) {
-                Optional<Bill> billOptional = billRepository.findById(billId);
-                if (billOptional.isPresent()) {
-                    Bill bill = billOptional.get();
-                    if (!Objects.equals(bill.getStatusId(), billStatusDTO.getBillStatusId())) {
-                        bill.setStatusId(billStatusDTO.getBillStatusId());
-                        billRepository.save(bill);
+        public Integer getUserIdFromToken (String token){
+
+            Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
+            String userIdString = claims.getSubject();
+            System.out.println("getProperty " + token + " ,  " + userIdString);
+            return Integer.parseInt(userIdString);
+        }
+
+        public ResponseEntity getBillsForAdminByTokenForUserId (String token,int langId, Integer userId, Pageable
+        pageable){
+            Integer userAdminId = getUserIdFromToken(token);
+            User userAdmin = userRepository.findUserById(userAdminId);
+            ReturnObjectPaging returnObject = new ReturnObjectPaging();
+
+            if (userAdmin.getAccountTypeId() == ADMIN_TYPE) {
+                Page<GetBillsDTO> billsPage = billRepository.findAllByLangIdAndUserId(langId, userId, pageable);
+                Long countOfAllBills = billsPage.getTotalElements();
+                returnObject.setTotalPages(billsPage.getTotalPages());
+                returnObject.setTotalCount(billsPage.getTotalElements());
+                if (billsPage.isEmpty()) {
+                    returnObject.setMessage("No Bills Found");
+                    returnObject.setStatus(false);
+                    returnObject.setData(new ArrayList<>());
+                    return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+                } else {
+                    returnObject.setMessage(countOfAllBills + " Bills Loaded Successfully");
+                    returnObject.setData(billsPage.getContent());
+                    returnObject.setStatus(true);
+                    return ResponseEntity.ok(returnObject);
+                }
+            } else {
+                returnObject.setMessage("Un Authorized");
+                returnObject.setStatus(false);
+                returnObject.setData(null);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+            }
+
+        }
+
+        public ResponseEntity<?> changeBillStatus (String token, Integer billId, BillStatusDTO billStatusDTO){
+            ReturnObject returnObject = new ReturnObject();
+            if (token != null) {
+                Integer userIdFromToken = getUserIdFromToken(token);
+                if (userRepository.findUserById(userIdFromToken).getAccountTypeId() == ADMIN_TYPE) {
+                    Optional<Bill> billOptional = billRepository.findById(billId);
+                    if (billOptional.isPresent()) {
+                        Bill bill = billOptional.get();
+                        if (!Objects.equals(bill.getStatusId(), billStatusDTO.getBillStatusId())) {
+                            bill.setStatusId(billStatusDTO.getBillStatusId());
+                            billRepository.save(bill);
+                            returnObject.setStatus(true);
+                            returnObject.setData(bill);
+                            returnObject.setMessage("Status changed Successfully " + billId);
+                            return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+                        } else {
+                            bill.setStatusId(billStatusDTO.getBillStatusId());
+                            billRepository.save(bill);
+                            returnObject.setStatus(false);
+                            returnObject.setData(bill);
+                            returnObject.setMessage("This is the already set status " + billId);
+                            return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+                        }
+                    } else {
+                        returnObject.setStatus(false);
+                        returnObject.setData("No bill with " + billId);
+                        returnObject.setMessage("No bill found");
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+                    }
+                } else {
+                    returnObject.setStatus(false);
+                    returnObject.setData(null);
+                    returnObject.setMessage("Not admin");
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+                }
+            } else {
+                returnObject.setStatus(false);
+                returnObject.setData(null);
+                returnObject.setMessage("Not token found");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+            }
+        }
+
+        public ResponseEntity<?> addAdminNotes (String token, Integer jobCardId, AddJobCardNotes addJobCardNotes){
+            ReturnObject returnObject = new ReturnObject();
+            Integer userId = userService.getUserIdFromToken(token);
+            User user = userRepository.findUserById(userId);
+            if (user != null) {
+                if (user.getAccountTypeId() == ADMIN_TYPE) {
+                    Optional<Bill> billOptional = billRepository.findById(jobCardId);
+                    if (billOptional.isPresent()) {
+                        Bill bill = billOptional.get();
+                        if (addJobCardNotes.isForCustomer())
+                            bill.setCustomerNotes(addJobCardNotes.getNotes());
+                        else
+                            bill.setAdminNotes(addJobCardNotes.getNotes());
+                        bill = billRepository.save(bill);
                         returnObject.setStatus(true);
                         returnObject.setData(bill);
-                        returnObject.setMessage("Status changed Successfully " + billId);
+                        returnObject.setMessage("Notes Added Successfully");
                         return ResponseEntity.status(HttpStatus.OK).body(returnObject);
                     } else {
-                        bill.setStatusId(billStatusDTO.getBillStatusId());
-                        billRepository.save(bill);
+                        returnObject.setMessage("No Job Card found");
+                        returnObject.setData(null);
                         returnObject.setStatus(false);
-                        returnObject.setData(bill);
-                        returnObject.setMessage("This is the already set status " + billId);
-                        return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
                     }
                 } else {
+                    returnObject.setMessage("User Not Admin");
+                    returnObject.setData(null);
                     returnObject.setStatus(false);
-                    returnObject.setData("No bill with " + billId);
-                    returnObject.setMessage("No bill found");
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
                 }
             } else {
-                returnObject.setStatus(false);
+                returnObject.setMessage("User doesn't exist");
                 returnObject.setData(null);
-                returnObject.setMessage("Not admin");
+                returnObject.setStatus(false);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
             }
-        } else {
-            returnObject.setStatus(false);
-            returnObject.setData(null);
-            returnObject.setMessage("Not token found");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
-    }
 
-    public ResponseEntity<?> addAdminNotes(String token, Integer jobCardId, AddJobCardNotes addJobCardNotes) {
-        ReturnObject returnObject = new ReturnObject();
-        Integer userId = userService.getUserIdFromToken(token);
-        User user = userRepository.findUserById(userId);
-        if (user != null) {
-            if (user.getAccountTypeId() == ADMIN_TYPE) {
-                Optional<Bill> billOptional = billRepository.findById(jobCardId);
-                if (billOptional.isPresent()) {
-                    Bill bill = billOptional.get();
-                    if (addJobCardNotes.isForCustomer())
+        public ResponseEntity<?> addCustomerNotes (String token, Integer jobCardId, AddJobCardNotes addJobCardNotes){
+            ReturnObject returnObject = new ReturnObject();
+            Integer userId = userService.getUserIdFromToken(token);
+            User user = userRepository.findUserById(userId);
+            if (user != null) {
+                if (user.getAccountTypeId() == USER_TYPE) {
+                    Optional<Bill> billOptional = billRepository.findById(jobCardId);
+                    if (billOptional.isPresent()) {
+                        Bill bill = billOptional.get();
                         bill.setCustomerNotes(addJobCardNotes.getNotes());
-                    else
-                        bill.setAdminNotes(addJobCardNotes.getNotes());
-                    bill = billRepository.save(bill);
-                    returnObject.setStatus(true);
-                    returnObject.setData(bill);
-                    returnObject.setMessage("Notes Added Successfully");
-                    return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+                        bill = billRepository.save(bill);
+                        returnObject.setStatus(true);
+                        returnObject.setData(bill);
+                        returnObject.setMessage("Notes Added Successfully");
+                        return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+                    } else {
+                        returnObject.setMessage("No Job Card found");
+                        returnObject.setData(null);
+                        returnObject.setStatus(false);
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+                    }
                 } else {
-                    returnObject.setMessage("No Job Card found");
+                    returnObject.setMessage("User Not Admin");
                     returnObject.setData(null);
                     returnObject.setStatus(false);
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
                 }
             } else {
-                returnObject.setMessage("User Not Admin");
+                returnObject.setMessage("User doesn't exist");
                 returnObject.setData(null);
                 returnObject.setStatus(false);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
             }
-        } else {
-            returnObject.setMessage("User doesn't exist");
-            returnObject.setData(null);
-            returnObject.setStatus(false);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
-    }
 
-    public ResponseEntity<?> addCustomerNotes(String token, Integer jobCardId, AddJobCardNotes addJobCardNotes) {
-        ReturnObject returnObject = new ReturnObject();
-        Integer userId = userService.getUserIdFromToken(token);
-        User user = userRepository.findUserById(userId);
-        if (user != null) {
-            if (user.getAccountTypeId() == USER_TYPE) {
-                Optional<Bill> billOptional = billRepository.findById(jobCardId);
-                if (billOptional.isPresent()) {
-                    Bill bill = billOptional.get();
-                    bill.setCustomerNotes(addJobCardNotes.getNotes());
-                    bill = billRepository.save(bill);
-                    returnObject.setStatus(true);
-                    returnObject.setData(bill);
-                    returnObject.setMessage("Notes Added Successfully");
-                    return ResponseEntity.status(HttpStatus.OK).body(returnObject);
-                } else {
-                    returnObject.setMessage("No Job Card found");
-                    returnObject.setData(null);
-                    returnObject.setStatus(false);
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        public ResponseEntity getBillsData (Integer billId){
+            ReturnObject returnObject = new ReturnObject();
+            Optional<Bill> billOptional = billRepository.findById(billId);
+            AddBillDTO addBillDTO = new AddBillDTO();
+            if (billOptional.isPresent()) {
+                Bill bill = billOptional.get();
+                Optional<List<BillProduct>> billProductOptional = billProductRepository.findAllByBillId(billOptional.get().getId());
+                if (billProductOptional.isPresent()) {
+                    List<BillProduct> billProducts = billProductOptional.get();
+                    ArrayList<ProductBillDTO> billProductList = new ArrayList<>();
+                    ArrayList<OtherProductDTO> otherProductDTOArrayList = new ArrayList<>();
+                    for (BillProduct billProduct : billProducts) {
+                        if (billProduct.getProductId() != null) {
+                            ProductBillDTO productBillDTO = new ProductBillDTO(billProduct);
+                            Optional<Product> productOptional = productRepository.findById(billProduct.getProductId());
+                            if (productOptional.isPresent()) {
+                                Product product = productOptional.get();
+                                List<ProductImages> productImages = productImagesRepository.findAllByProductId(product.getId());
+                                productBillDTO.setProductName(product.getCode());
+                                if (!productImages.isEmpty()) {
+                                    productBillDTO.setImageUrl(productImages.get(0).getUrl());
+                                }
+                            }
+                            billProductList.add(productBillDTO);
+                        } else {
+                            OtherProductDTO otherProductDTO = new OtherProductDTO(billProduct);
+                            otherProductDTOArrayList.add(otherProductDTO);
+                        }
+                    }
+                    addBillDTO.setProductBillDTOList(billProductList);
+                    addBillDTO.setOtherProductsDTOList(otherProductDTOArrayList);
                 }
-            } else {
-                returnObject.setMessage("User Not Admin");
-                returnObject.setData(null);
-                returnObject.setStatus(false);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
-            }
-        } else {
-            returnObject.setMessage("User doesn't exist");
-            returnObject.setData(null);
-            returnObject.setStatus(false);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
-        }
-    }
-
-    public ResponseEntity getBillsData(Integer billId) {
-        ReturnObject returnObject = new ReturnObject();
-        Optional<Bill> billOptional = billRepository.findById(billId);
-        AddBillDTO addBillDTO = new AddBillDTO();
-        if (billOptional.isPresent()) {
-            Bill bill = billOptional.get();
-            Optional<List<BillProduct>> billProductOptional = billProductRepository.findAllByBillId(billOptional.get().getId());
-            if (billProductOptional.isPresent()) {
-                List<BillProduct> billProducts = billProductOptional.get();
-                ArrayList<ProductBillDTO> billProductList = new ArrayList<>();
-                ArrayList<OtherProductDTO> otherProductDTOArrayList = new ArrayList<>();
-                for(BillProduct billProduct : billProducts){
-                    if(billProduct.getProductId() != null){
-                        ProductBillDTO productBillDTO = new ProductBillDTO(billProduct);
-                        billProductList.add(productBillDTO);
-                    }else{
-                        OtherProductDTO otherProductDTO = new OtherProductDTO(billProduct);
-                        otherProductDTOArrayList.add(otherProductDTO);
+                String referenceNumber = bill.getReferenceNumber();
+                if (referenceNumber != null) {
+                    // Remove "Inv" from anywhere in the string
+                    referenceNumber = referenceNumber.replace("Inv", "");
+                    // Set it back to the bill object if needed
+                    bill.setReferenceNumber(referenceNumber);
+                }
+                addBillDTO.setUserId(billOptional.get().getUserId());
+                Double downPayment = 0.0;
+                Optional<JobCard> jobCardOptional = jobCardRepository.findByCode(referenceNumber);
+                if (jobCardOptional.isPresent()) {
+                    JobCard jobCard = jobCardOptional.get();
+                    if (jobCard.getDownPayment() != null) {
+                        downPayment = jobCard.getDownPayment();
                     }
                 }
-                addBillDTO.setProductBillDTOList(billProductList);
-                addBillDTO.setOtherProductsDTOList(otherProductDTOArrayList);
-            }
-            String referenceNumber = bill.getReferenceNumber();
-            if (referenceNumber != null) {
-                // Remove "Inv" from anywhere in the string
-                referenceNumber = referenceNumber.replace("Inv", "");
-                // Set it back to the bill object if needed
-                bill.setReferenceNumber(referenceNumber);
-            }
-            addBillDTO.setUserId(billOptional.get().getUserId());
-            Double downPayment = 0.0;
-            Optional<JobCard> jobCardOptional = jobCardRepository.findByCode(referenceNumber);
-            if(jobCardOptional.isPresent()) {
-                JobCard jobCard = jobCardOptional.get();
-                if (jobCard.getDownPayment() != null) {
-                    downPayment = jobCard.getDownPayment();
+                User user = userRepository.findUserById(bill.getUserId());
+                if (user != null) {
+                    addBillDTO.setUserName(user.getName());
+                } else {
+                    addBillDTO.setUserName("");
+                }
+                addBillDTO.setDownPayment(downPayment);
+                addBillDTO.setBillTypeId(billOptional.get().getBillTypeId());
+                addBillDTO.setDiscount(billOptional.get().getDiscount());
+                addBillDTO.setDate(billOptional.get().getDate());
+                addBillDTO.setTotal(billOptional.get().getTotal());
+                addBillDTO.setPrivateNotes(billOptional.get().getAdminNotes());
+                addBillDTO.setNotes(billOptional.get().getCustomerNotes());
+                addBillDTO.setReferenceNumber(billOptional.get().getReferenceNumber());
+                Optional<Car> carOptional = carRepository.findById(billOptional.get().getCarId());
+                if (carOptional.isPresent()) {
+                    Car car = carOptional.get();
+                    addBillDTO.setCarData(car.getLicenseNumber() + " , " + car.getPlateNumber() + " , " + car.getCreationYear());
                 }
             }
-            addBillDTO.setDownPayment(downPayment);
-            addBillDTO.setBillTypeId(billOptional.get().getBillTypeId());
-            addBillDTO.setDiscount(billOptional.get().getDiscount());
-            addBillDTO.setDate(billOptional.get().getDate());
-            addBillDTO.setTotal(billOptional.get().getTotal());
-            addBillDTO.setPrivateNotes(billOptional.get().getAdminNotes());
-            addBillDTO.setNotes(billOptional.get().getCustomerNotes());
-            addBillDTO.setReferenceNumber(billOptional.get().getReferenceNumber());
-            Optional<Car> carOptional = carRepository.findById(billOptional.get().getCarId());
-            if(carOptional.isPresent()) {
-                Car car = carOptional.get();
-                addBillDTO.setCarData(car.getLicenseNumber() + " , " + car.getPlateNumber() + " , " + car.getCreationYear());
-            }
+            returnObject.setData(addBillDTO);
+            returnObject.setMessage("Loaded Successfully");
+            returnObject.setStatus(true);
+            return ResponseEntity.ok(returnObject);
         }
-        returnObject.setData(addBillDTO);
-        returnObject.setMessage("Loaded Successfully");
-        returnObject.setStatus(true);
-        return ResponseEntity.ok(returnObject);
     }
-}

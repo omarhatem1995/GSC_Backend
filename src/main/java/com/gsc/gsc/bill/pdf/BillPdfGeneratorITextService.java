@@ -261,7 +261,7 @@ public class BillPdfGeneratorITextService {
 
             // Add "JOB NO: xxx" to the second cell, aligned to the right
             table.addCell(new com.itextpdf.layout.element.Cell()
-                    .add(new Paragraph("BILL NO: " + bill.getReferenceNumber()).setFontSize(12f))
+                    .add(new Paragraph("BILL NO: " + "Inv"+bill.getReferenceNumber()).setFontSize(12f))
                     .setTextAlignment(TextAlignment.RIGHT)
                     .setBorder(Border.NO_BORDER));
 

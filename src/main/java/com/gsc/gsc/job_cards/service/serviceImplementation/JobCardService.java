@@ -23,7 +23,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -436,7 +435,7 @@ public class JobCardService {
                         String productImageUrl = "";
                         if (!productImages.isEmpty())
                             productImageUrl = productImages.get(0).getUrl();
-                        productBillDTOList.add(new ProductBillDTO(product.getId(), product.getCode(), product.getPrice(), 0, 0, jobCardProductList.get(i).getQuantity(), product.getId(), productImageUrl, jobCardProductList.get(i).getCreatedBy()));
+                        productBillDTOList.add(new ProductBillDTO(product.getId(), product.getCode(), product.getPrice(), 0, 0, jobCardProductList.get(i).getQuantity(), product.getId(), productImageUrl, product.getCode(), jobCardProductList.get(i).getCreatedBy()));
 
                     }
                 } else {
@@ -456,11 +455,11 @@ public class JobCardService {
                         } else if (jobCardCreatedByUser.get().getAccountTypeId().equals(ADMIN_TYPE)) {
                             userType = "Admin";
                             JobCardNotesDTO jobCardNotesDTO = new JobCardNotesDTO(jobCardNotes, jobCardCreatedByUser.get().getName(), userType);
-                            if(jobCardNotes.getIsPrivate()) {
+                            if (jobCardNotes.getIsPrivate()) {
                                 if (isUserAdmin) {
                                     jobCardNotesDTOList.add(jobCardNotesDTO);
                                 }
-                            }else{
+                            } else {
                                 jobCardNotesDTOList.add(jobCardNotesDTO);
                             }
                         }
@@ -785,6 +784,7 @@ public class JobCardService {
 
         return returnObject;
     }
+
     public ReturnObject submitByAdmin(String token, Integer jobCardId) {
         Integer userId = userService.getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
@@ -798,11 +798,9 @@ public class JobCardService {
                     JobCard existingJobCard = existingJobCardOptional.get();
 
                     // Update job card properties
-                   if (existingJobCard.getJobCardStatusId().equals(APPROVED)) {
-                        existingJobCard.setJobCardStatusId(COMPLETED); //Completed
-                        //Create Invoice
-                        billService.createJobCardBill(existingJobCard.getUserId(), existingJobCard);
-                    }
+                    existingJobCard.setJobCardStatusId(COMPLETED); //Completed
+                    //Create Invoice
+                    billService.createJobCardBill(existingJobCard.getUserId(), existingJobCard);
                     // Save updated job card
                     jobCardRepository.save(existingJobCard);
 
@@ -840,10 +838,11 @@ public class JobCardService {
         return returnObject;
     }
 
-    public void getCount(){
-        List<JobCardNotes> adminNotesNotYetApprovedByCustomer = jobCardNotesRepository.findAllByJobCardIdAndIsPrivateAndApprovedByCustomerAtIsNullAndCreatedByNot(26, false,1);
+    public void getCount() {
+        List<JobCardNotes> adminNotesNotYetApprovedByCustomer = jobCardNotesRepository.findAllByJobCardIdAndIsPrivateAndApprovedByCustomerAtIsNullAndCreatedByNot(26, false, 1);
         System.out.println(adminNotesNotYetApprovedByCustomer.size());
     }
+
     public ResponseEntity updateStatusByUser(String token, Integer jobCardId, JobCardsDTO jobCardsDTO) {
         ReturnObject returnObject = new ReturnObject();
         if (token != null) {

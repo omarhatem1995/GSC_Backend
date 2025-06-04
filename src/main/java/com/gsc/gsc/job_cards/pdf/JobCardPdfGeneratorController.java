@@ -30,7 +30,7 @@ public class JobCardPdfGeneratorController {
     @Autowired
     JobCardPdfGeneratorITextService jobCardPdfGeneratorITextService;
 
-    @GetMapping("/pdf2/{jobCardId}")
+    @GetMapping("jobCard/pdf2/{jobCardId}")
     public ResponseEntity<ReturnObject> generateJobCardPdfIText(@RequestHeader("Authorization") String token, @PathVariable int jobCardId, @RequestParam String macAddress,
                                                                 @RequestParam(value = "includePrivateNotes",required = false) Boolean includePrivateNotes) throws IOException {
         // Locate your PDF file

@@ -113,6 +113,11 @@ public class AdminController {
                                             @PathVariable Integer billId) {
         return billService.updateBillByAdmin(token, billDTO, billId);
     }
+    @PutMapping(value = "billStatus/{billId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity updateBillStatus(@RequestHeader("Authorization") String token,
+                                            @PathVariable Integer billId) {
+        return billService.updateBillStatus(token, billId);
+    }
 
     @PostMapping("send_fcm")
     public ResponseEntity sendNotificationToUser(@RequestHeader("Authorization") String token,@RequestBody NotificationDTO notificationDTO) {
