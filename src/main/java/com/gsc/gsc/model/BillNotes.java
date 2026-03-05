@@ -1,6 +1,5 @@
 package com.gsc.gsc.model;
 
-import com.gsc.gsc.job_cards.dto.JobCardsDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,14 +11,14 @@ import java.sql.Timestamp;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "job_card_notes", schema = "gsc", catalog = "")
-public class JobCardNotes {
+@Table(name = "bill_notes", schema = "gsc", catalog = "")
+public class BillNotes {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Id
     @Column(name = "id")
     private Integer id;
-    @Column(name = "job_card_id")
-    private Integer jobCardId;
+    @Column(name = "bill_id")
+    private Integer billId;
     @Column(name = "message")
     private String message;
     @Column(name = "created_by")
@@ -35,10 +34,4 @@ public class JobCardNotes {
     @Column(name = "updated_at")
     private Timestamp updatedAt;
 
-    public JobCardNotes(Integer userId, String customerNotes, boolean b, Integer id) {
-        this.createdBy = userId;
-        this.message = customerNotes;
-        this.isPrivate = b;
-        this.jobCardId = id;
-    }
 }

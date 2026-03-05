@@ -15,8 +15,9 @@ import java.util.Optional;
 public interface BillRepository extends JpaRepository<Bill, Integer> {
     Optional<List<Bill>> findAllByUserId(Integer userId);
     List<Bill> findAllByReferenceNumber(String referenceNumber);
-
-    @Query("SELECT NEW com.gsc.gsc.bill.dto.GetBillsDTO(b.id, b.referenceNumber, b.userId, " +
+    Optional<Bill> findTopByOrderByIdDesc();
+    @Query(value = "SELECT NEW com.gsc.gsc.bill.dto.GetBillsDTO(" +
+            "b.id, b.referenceNumber, b.userId, " +
             "bst.name, bs.code, b.createdBy, b.total, b.discount, b.createdAt, " +
             "b.adminNotes, b.customerNotes, c.licenseNumber, " +
             "m.code, btt.name, bt.code, btt.description) " +
@@ -28,10 +29,33 @@ public interface BillRepository extends JpaRepository<Bill, Integer> {
             "LEFT JOIN BillTypeText btt ON btt.billTypeId = bt.id " +
             "LEFT JOIN CBillsStatusText bst ON bs.id = bst.billStatusId " +
             "LEFT JOIN Lang l ON l.id = bst.langId " +
-            "WHERE b.userId = :userId AND bst.langId = :langId AND btt.langId = :langId ORDER BY b.createdAt DESC")
-    Optional<List<GetBillsDTO>> findAllByUserIdAndLangId(Integer userId, Integer langId);
+            "WHERE b.userId = :userId AND bst.langId = :langId AND btt.langId = :langId " +
+            "ORDER BY b.createdAt DESC")
+    Page<GetBillsDTO> findAllByUserIdAndLangId(@Param("userId") Integer userId,
+                                               @Param("langId") Integer langId,
+                                               Pageable pageable);
+    @Query("SELECT NEW com.gsc.gsc.bill.dto.GetBillsDTO(b.id, b.referenceNumber, b.userId, " + "bst.name, bs.code, b.createdBy, b.total, b.discount, b.createdAt, " + "b.adminNotes, b.customerNotes, c.licenseNumber, " + "m.code, btt.name, bt.code, btt.description) " + "FROM Bill b " + "LEFT JOIN Car c ON b.carId = c.id " + "LEFT JOIN Model m ON c.modelId = m.id " + "LEFT JOIN CBillStatus bs ON b.statusId = bs.id " + "LEFT JOIN BillType bt ON bt.id = b.billTypeId " + "LEFT JOIN BillTypeText btt ON btt.billTypeId = bt.id " + "LEFT JOIN CBillsStatusText bst ON bs.id = bst.billStatusId " + "LEFT JOIN Lang l ON l.id = bst.langId " + "WHERE b.userId = :userId AND bst.langId = :langId AND btt.langId = :langId ORDER BY b.createdAt DESC") Optional<List<GetBillsDTO>> findAllByUserIdAndLangId(Integer userId, Integer langId);
 
-
+    @Query(value = "SELECT NEW com.gsc.gsc.bill.dto.GetBillsDTO(" +
+            "b.id, b.referenceNumber, b.userId, " +
+            "bst.name, bs.code, b.createdBy, b.total, b.discount, b.createdAt, " +
+            "b.adminNotes, b.customerNotes, c.licenseNumber, " +
+            "m.code, btt.name, bt.code, btt.description) " +
+            "FROM Bill b " +
+            "LEFT JOIN User u ON u.id = b.userId " +
+            "LEFT JOIN Car c ON b.carId = c.id " +
+            "LEFT JOIN Model m ON c.modelId = m.id " +
+            "LEFT JOIN CBillStatus bs ON b.statusId = bs.id " +
+            "LEFT JOIN BillType bt ON bt.id = b.billTypeId " +
+            "LEFT JOIN BillTypeText btt ON btt.billTypeId = bt.id " +
+            "LEFT JOIN CBillsStatusText bst ON bs.id = bst.billStatusId " +
+            "LEFT JOIN Lang l ON l.id = bst.langId " +
+            "WHERE LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%')) " +
+            "AND bst.langId = :langId AND btt.langId = :langId " +
+            "ORDER BY b.createdAt DESC")
+    Page<GetBillsDTO> findAllByCustomerNameContainingIgnoreCaseAndLangId(@Param("search") String search,
+                                                                         @Param("langId") Integer langId,
+                                                                         Pageable pageable);
 
     @Query("SELECT NEW com.gsc.gsc.bill.dto.GetBillsDTO(b.id, b.referenceNumber, b.userId, " +
             "bst.name, bs.code, b.createdBy, b.total, b.discount, b.createdAt, " +

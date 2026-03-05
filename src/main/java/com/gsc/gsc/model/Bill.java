@@ -19,7 +19,7 @@ public class Bill {
     @Column(name = "total")
     private Double total;
     @Column(name = "discount")
-    private Integer discount;
+    private Double discount;
     @Column(name = "user_id")
     private int userId;
     @Column(name = "created_at")

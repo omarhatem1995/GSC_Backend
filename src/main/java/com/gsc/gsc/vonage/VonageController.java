@@ -1,6 +1,7 @@
 package com.gsc.gsc.vonage;
 
 import com.gsc.gsc.constants.ReturnObject;
+import com.gsc.gsc.user.dto.UserDTO;
 import com.gsc.gsc.user.service.servicesImplementation.UserService;
 import com.gsc.gsc.utilities.VonageConstants;
 import com.vonage.client.VonageClient;
@@ -29,6 +30,9 @@ public class VonageController {
 
         VerifyResponse response = client.getVerifyClient().verify("+2"+vonageModel.getPhone(), "Brand");
         ReturnObject returnObject = new ReturnObject();
+        UserDTO userDTO = new UserDTO();
+        userDTO.setPhone(vonageModel.phone);
+        userService.resendOtp(userDTO);
         if (response.getStatus() == VerifyStatus.OK) {
             System.out.printf("RequestID: %s", response.getRequestId());
             returnObject.setMessage("Code Send Successfully");

@@ -14,7 +14,10 @@ public interface JobCardRepository extends JpaRepository<JobCard, Integer> {
     Optional<JobCard> findByCode(String code);
 
     Page<JobCard> findAll(Pageable pageable);
-
+    Page<JobCard> findByCodeContainingIgnoreCase(
+            String code,
+            Pageable pageable
+    );
     @Query("SELECT j FROM JobCard j ORDER BY j.id DESC")
     JobCard findLatestJobCard();
 

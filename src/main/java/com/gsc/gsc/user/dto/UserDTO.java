@@ -14,6 +14,7 @@ public class UserDTO {
     private String mailBox;
     private String age;
     private String address;
+    private Boolean isVerified;
     private String profileImage;
     private String commercialRegistry;
     private String establishmentRegistration;

@@ -34,7 +34,7 @@ public class JobCardPdfGeneratorController {
     public ResponseEntity<ReturnObject> generateJobCardPdfIText(@RequestHeader("Authorization") String token, @PathVariable int jobCardId, @RequestParam String macAddress,
                                                                 @RequestParam(value = "includePrivateNotes",required = false) Boolean includePrivateNotes) throws IOException {
         // Locate your PDF file
-        ReturnObject returnObject = jobCardPdfGeneratorITextService.exportIText(token,jobCardId, macAddress,includePrivateNotes);
+        ReturnObject returnObject = jobCardPdfGeneratorITextService.exportIText2(token,jobCardId, macAddress,includePrivateNotes);
 
         if (returnObject.isStatus()) {
             Object data = returnObject.getData();

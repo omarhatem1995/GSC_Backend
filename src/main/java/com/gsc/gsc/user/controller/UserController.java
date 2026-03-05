@@ -26,10 +26,12 @@ public class UserController {
         return userService.create(userDTO,httpRes);
     }
 
+/*
     @PostMapping("resendOtp")
     public ResponseEntity resendOtp(@RequestBody UserDTO userDTO) {
         return userService.resendOtp(userDTO);
     }
+*/
 
     @PutMapping("update")
     public ResponseEntity updateUser(@RequestHeader ("Authorization") String token, @RequestBody UserDTO userDTO) {

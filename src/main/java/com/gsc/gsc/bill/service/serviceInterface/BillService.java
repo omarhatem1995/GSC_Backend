@@ -55,8 +55,6 @@ public class BillService implements IBillService {
     @Autowired
     private ProductRepository productRepository;
     @Autowired
-    private ProductDetailsRepository productDetailsRepository;
-    @Autowired
     private ProductDetailsViewRepository productDetailsViewRepository;
     @Autowired
     private BillTypeTextRepository billTypeTextRepository;
@@ -66,6 +64,8 @@ public class BillService implements IBillService {
     private JobCardProductRepository jobCardProductRepository;
     @Autowired
     private ProductImagesRepository productImagesRepository;
+    @Autowired
+    private BillNotesRepository billNotesRepository;
 
     @Override
     public Optional<Car> getById(Integer id) {
@@ -115,69 +115,101 @@ public class BillService implements IBillService {
 
         }
     }
+    public ResponseEntity<?> getBills(String token, Integer selectedUserId, String search, Integer langId, Pageable pageable) {
+        // Normally decode the user ID and role from the token
+        Integer userIdFromToken = userService.getUserIdFromToken(token);
+        User user = userRepository.findUserById(userIdFromToken);
 
-    public ResponseEntity<?> getBillsForAdminByToken(String token, Integer langId, Pageable pageable) {
-        Integer userId = 2;
+        ReturnObjectPaging returnObject = new ReturnObjectPaging();
+
+        if (user == null) {
+            returnObject.setMessage("User not found");
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
+        }
+
+        Page<GetBillsDTO> billsPage;
+
+        if (user.getAccountTypeId() == ADMIN_TYPE) {
+            // Admin logic
+            if (selectedUserId != null && selectedUserId > 0) {
+                // Filter by specific user
+                billsPage = billRepository.findAllByUserIdAndLangId(selectedUserId, langId, pageable);
+            } else if (search != null && !search.trim().isEmpty()) {
+                // Search by customer name
+                billsPage = billRepository.findAllByCustomerNameContainingIgnoreCaseAndLangId(search.trim(), langId, pageable);
+            } else {
+                // Default: get all bills
+                billsPage = billRepository.findAllByLangId(langId, pageable);
+            }
+        } else {
+            // Normal user logic: always filter by token's user ID
+            billsPage = billRepository.findAllByUserIdAndLangId(userIdFromToken, langId, pageable);
+        }
+
+        // Build response
+        returnObject.setTotalPages(billsPage.getTotalPages());
+        returnObject.setTotalCount(billsPage.getTotalElements());
+        returnObject.setMessage(billsPage.getNumberOfElements() + " Bills Loaded Successfully");
+        returnObject.setData(billsPage.getContent());
+        returnObject.setStatus(true);
+
+        return ResponseEntity.ok(returnObject);
+    }
+
+    public ResponseEntity<?> getBillsForAdminByToken(String token, Integer selectedUserId, String search, Integer langId, Pageable pageable) {
+        Integer userId = 2; // retrieved from token normally
         User user = userRepository.findUserById(userId);
         ReturnObjectPaging returnObject = new ReturnObjectPaging();
 
-        if (user.getAccountTypeId() == ADMIN_TYPE) {
-//            Page<Bill> billsPage = billRepository.findAll(pageable);
-            Page<GetBillsDTO> billsPage = billRepository.findAllByLangId(1, pageable);
+        if (user == null) {
+            returnObject.setMessage("User not found");
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
+        }
 
+        if (user.getAccountTypeId() == ADMIN_TYPE) {
+            Page<GetBillsDTO> billsPage;
+
+            // ✅ Handle filtering logic
+            if (selectedUserId != null && selectedUserId > 0) {
+                // Search by user ID
+                billsPage = billRepository.findAllByUserIdAndLangId(selectedUserId, langId, pageable);
+            } else if (search != null && !search.trim().isEmpty()) {
+                // Search by customer name (case insensitive)
+                billsPage = billRepository.findAllByCustomerNameContainingIgnoreCaseAndLangId(search.trim(), langId, pageable);
+            } else {
+                // Default: get all
+                billsPage = billRepository.findAllByLangId(langId, pageable);
+            }
+
+            // ✅ Handle empty results
             if (billsPage.isEmpty()) {
                 returnObject.setMessage("No Bills Found");
                 returnObject.setStatus(false);
                 returnObject.setData(new ArrayList<>());
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
-            } else {
-
-             /*   List<GetBillsDTO> billsDTOList = new ArrayList<>();
-
-                for(Bill bill : billsPage){
-                    GetBillsDTO billsDTO = new GetBillsDTO();
-                    billsDTO.setCreatedBy(bill.getCreatedBy());
-                    billsDTO.setReferenceNumber(bill.getReferenceNumber());
-                    billsDTO.setId(bill.getId());
-                    billsDTO.setCustomerNotes(bill.getCustomerNotes());
-                    billsDTO.setCreatedAt(bill.getCreatedAt());
-                    billsDTO.setAdminNotes(bill.getAdminNotes());
-                    billsDTO.setTotal(bill.getTotal());
-                    Optional<BillType> billTypeOptional = billTypeRepository.findBillTypeById(bill.getBillTypeId());
-                    Optional<CBillStatus> billStatusOptional = cBillStatusRepository.findById(bill.getStatusId());
-                    billStatusOptional.ifPresent(cBillStatus -> billsDTO.setStatus(cBillStatus.getCode()));
-                    if(billTypeOptional.isPresent()) {
-                        billsDTO.setBillTypeName(billTypeOptional.get().getCode());
-                        Optional<BillTypeText> billTypeTextOptional = billTypeTextRepository.findById(bill.getStatusId());
-                        billTypeTextOptional.ifPresent(billTypeText -> billsDTO.setBillTypeCode(billTypeText.getName()));
-                    }
-                    if(bill.getCarId() != null) {
-                        Car car = findCarById(bill.getCarId());
-                        if(car != null) {
-                            billsDTO.setCarLicenseNumber(car.getLicenseNumber());
-                            Model model = findModelById(car.getModelId());
-                            if(model != null) {
-                                billsDTO.setCarCode(model.getCode());
-                            }
-                        }
-                    }
-                    billsDTOList.add(billsDTO);
-                }*/
-
-                returnObject.setTotalPages(billsPage.getTotalPages());
-                returnObject.setTotalCount(billsPage.getTotalElements());
-                returnObject.setMessage(billsPage.getSize() + " Bills Loaded Successfully");
-                returnObject.setData(billsPage.getContent());
-                returnObject.setStatus(true);
-                return ResponseEntity.ok(returnObject);
+                return ResponseEntity.status(HttpStatus.OK).body(returnObject);
             }
+
+            // ✅ Build success response
+            returnObject.setTotalPages(billsPage.getTotalPages());
+            returnObject.setTotalCount(billsPage.getTotalElements());
+            returnObject.setMessage(billsPage.getSize() + " Bills Loaded Successfully");
+            returnObject.setData(billsPage.getContent());
+            returnObject.setStatus(true);
+
+            return ResponseEntity.ok(returnObject);
+
         } else {
-            returnObject.setMessage("UnAuthorized");
+            returnObject.setMessage("Unauthorized");
             returnObject.setStatus(false);
             returnObject.setData(null);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
     }
+
 
     public Car findCarById(Integer carId) {
         Optional<Car> carOptional = carRepository.findById(carId);
@@ -197,12 +229,12 @@ public class BillService implements IBillService {
         }
     }
 
-    public ResponseEntity<?> createBillByAdmin(String token, AddBillDTO addBillDTO) {
+    public ResponseEntity<?> createBillByAdmin(String token,String adminMacAddress,String mobileVersion ,AddBillDTO addBillDTO) {
         Integer userId = getUserIdFromToken(token);
         User user = userRepository.findUserById(userId);
-        Optional<List<Bill>> billList = billRepository.findAllByUserId(userId);
+        Optional<Bill> lastBillOptional = billRepository.findTopByOrderByIdDesc(); // or order by createdAt
         ReturnObject returnObject = new ReturnObject();
-        if (addBillDTO.getUserId() == null) {
+        if (addBillDTO.getUserId() == null || addBillDTO.getUserId() == 0) {
             returnObject.setData(null);
             returnObject.setStatus(false);
             returnObject.setMessage("No user found");
@@ -210,10 +242,25 @@ public class BillService implements IBillService {
         }
         if (user.getAccountTypeId() == ADMIN_TYPE) {
             Bill bill = new Bill();
-            if (billList.isPresent() && !billList.get().isEmpty()) {
-                bill.setReferenceNumber(billList.get().get(0).getReferenceNumber() + 1);
+
+            if (lastBillOptional.isPresent()) {
+                String lastRef = lastBillOptional.get().getReferenceNumber(); // e.g., "InvJ000050"
+
+                // Extract prefix and numeric part
+                String prefix = lastRef.replaceAll("\\d+$", ""); // "InvJ"
+                String numberPart = lastRef.replaceAll("\\D+", ""); // "000050"
+
+                // Increment number
+                int number = Integer.parseInt(numberPart) + 1;
+
+                // Keep leading zeros
+                String newNumberPart = String.format("%0" + numberPart.length() + "d", number);
+
+                // Set new reference number
+                bill.setReferenceNumber(prefix + newNumberPart);
+
             } else {
-                bill.setReferenceNumber("123xeo2");
+                bill.setReferenceNumber("InvJ000001"); // starting default
             }
             bill.setStatusId(1);
             Optional<BillType> billType = billTypeRepository.findBillTypeByCode(String.valueOf(addBillDTO.getBillTypeId()));
@@ -227,35 +274,64 @@ public class BillService implements IBillService {
                 bill.setDate(addBillDTO.getDate());
                 bill.setUserId(addBillDTO.getUserId());
                 bill = billRepository.save(bill);
-                List<BillProduct> billProductList = new ArrayList<>();
-                for (int i = 0; i < addBillDTO.getProductBillDTOList().size(); i++) {
-                    BillProduct billProduct = new BillProduct();
-                    billProduct.setProductId(addBillDTO.getProductBillDTOList().get(i).getProductId());
-                    billProduct.setBillId(bill.getId());
-                    billProductList.add(billProduct);
-                    billProductRepository.save(billProduct);
+                if(addBillDTO.getNotes() != null && !addBillDTO.getNotes().isEmpty()){
+                    BillNotes billNotes = new BillNotes();
+                    billNotes.setIsPrivate(false);
+                    billNotes.setBillId(bill.getId());
+                    billNotes.setMessage(addBillDTO.getNotes());
+                    billNotes.setCreatedBy(ADMIN_TYPE);
+                    billNotes.setCustomerMobileVersion(mobileVersion);
+                    billNotesRepository.save(billNotes);
                 }
-                for (int i = 0; i < addBillDTO.getOtherProductsDTOList().size(); i++) {
-                    BillProduct billProduct = new BillProduct();
-                    billProduct.setBillId(bill.getId());
-                    billProduct.setProductId(999999);
-                    billProductList.add(billProduct);
-                    try {
-                        // Your save operation here
+                if(addBillDTO.getPrivateNotes() != null && !addBillDTO.getPrivateNotes().isEmpty()){
+                    BillNotes billNotes = new BillNotes();
+                    billNotes.setIsPrivate(true);
+                    billNotes.setBillId(bill.getId());
+                    billNotes.setMessage(addBillDTO.getPrivateNotes());
+                    billNotes.setCreatedBy(ADMIN_TYPE);
+                    billNotes.setCustomerMobileVersion(mobileVersion);
+                    billNotesRepository.save(billNotes);
+                }
+                List<BillProduct> billProductList = new ArrayList<>();
+                if (addBillDTO.getProductBillDTOList() != null) {
+                    for (int i = 0; i < addBillDTO.getProductBillDTOList().size(); i++) {
+                        BillProduct billProduct = new BillProduct();
+                        billProduct.setProductId(addBillDTO.getProductBillDTOList().get(i).getProductId());
+                        billProduct.setBillId(bill.getId());
+                        billProduct.setPrice(addBillDTO.getProductBillDTOList().get(i).getPrice());
+                        billProduct.setQuantity(addBillDTO.getProductBillDTOList().get(i).getQuantity());
+                        billProduct.setName(addBillDTO.getProductBillDTOList().get(i).getProductName());
+                        billProductList.add(billProduct);
                         billProductRepository.save(billProduct);
-                    } catch (Exception e) {
-                        if (e instanceof SQLIntegrityConstraintViolationException) {
-                            SQLIntegrityConstraintViolationException sqlException = (SQLIntegrityConstraintViolationException) e;
-                            System.out.println("SQL Statement causing the exception: " + sqlException.getSQLState());
-                            // Log or print the SQL statement for further analysis
+                    }
+                }
+                if (addBillDTO.getOtherProductsDTOList() != null) {
+                    for (int i = 0; i < addBillDTO.getOtherProductsDTOList().size(); i++) {
+                        BillProduct billProduct = new BillProduct();
+                        billProduct.setBillId(bill.getId());
+                        billProduct.setName(addBillDTO.getOtherProductsDTOList().get(i).getProductName());
+                        billProduct.setProductId(999999);
+                        billProduct.setPrice(Double.valueOf(addBillDTO.getOtherProductsDTOList().get(i).getPrice()));
+                        billProduct.setQuantity(addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
+                        billProductList.add(billProduct);
+                        try {
+                            // Your save operation here
+                            billProductRepository.save(billProduct);
+                        } catch (Exception e) {
+                            if (e instanceof SQLIntegrityConstraintViolationException) {
+                                SQLIntegrityConstraintViolationException sqlException = (SQLIntegrityConstraintViolationException) e;
+                                System.out.println("SQL Statement causing the exception: " + sqlException.getSQLState());
+                                // Log or print the SQL statement for further analysis
+                            }
                         }
                     }
                 }
-            } else {
-                returnObject.setData(addBillDTO);
-                returnObject.setStatus(false);
-                returnObject.setMessage("Bill type not found");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+
+                } else {
+                    returnObject.setData(addBillDTO);
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Bill type not found");
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
             }
 
             returnObject.setData(bill);
@@ -268,6 +344,11 @@ public class BillService implements IBillService {
             returnObject.setMessage("This user isn't Authorized to add bills");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
         }
+    }
+
+    public boolean checkExistingInvoice(JobCard jobCard){
+        List<Bill> billFound = billRepository.findAllByReferenceNumber("Inv"+jobCard.getCode());
+        return !billFound.isEmpty();
     }
 
     public void createJobCardBill(Integer userId, JobCard jobCard) {
@@ -310,7 +391,11 @@ public class BillService implements IBillService {
         if(user.getAccountTypeId().equals(ADMIN_TYPE)){
             if(existingBillOptional.isPresent()){
                 Bill bill = existingBillOptional.get();
-                bill.setStatusId(PAID);
+                if(bill.getStatusId().equals(NOT_PAID)) {
+                    bill.setStatusId(PAID);
+                }else{
+                    bill.setStatusId(NOT_PAID);
+                }
                 billRepository.save(bill);
                 returnObject.setData(bill);
                 returnObject.setStatus(false);
@@ -360,6 +445,23 @@ public class BillService implements IBillService {
             existingBill.setTotal(addBillDTO.getTotal());
             existingBill.setDiscount(addBillDTO.getDiscount());
             existingBill.setDate(addBillDTO.getDate());
+
+            if(addBillDTO.getPrivateNotes() != null){
+                BillNotes billNotes = new BillNotes();
+                billNotes.setMessage(addBillDTO.getPrivateNotes());
+                billNotes.setIsPrivate(true);
+                billNotes.setCreatedBy(userId);
+                billNotes.setBillId(existingBill.getId());
+                billNotesRepository.save(billNotes);
+            }
+            if(addBillDTO.getNotes() != null){
+                BillNotes billNotes = new BillNotes();
+                billNotes.setMessage(addBillDTO.getNotes());
+                billNotes.setIsPrivate(false);
+                billNotes.setCreatedBy(userId);
+                billNotes.setBillId(existingBill.getId());
+                billNotesRepository.save(billNotes);
+            }
 
             // Clear existing products associated with the bill
             billProductRepository.deleteAllByBillId(existingBill.getId());
@@ -441,10 +543,10 @@ public class BillService implements IBillService {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
             }
             bill.setReferenceNumber(newReferenceNumber);
-            bill.setStatusId(1);
+            bill.setStatusId(NOT_PAID);
             Optional<BillType> billType = billTypeRepository.findBillTypeByCode(String.valueOf(addBillDTO.getBillTypeId()));
             bill.setBillTypeId(billType.get().getId());
-            bill.setCreatedBy(ADMIN_TYPE);
+            bill.setCreatedBy(user.getAccountTypeId());
             bill.setAdminNotes(addBillDTO.getPrivateNotes());
             bill.setCustomerNotes(addBillDTO.getNotes());
             bill.setTotal(addBillDTO.getTotal());
@@ -722,10 +824,12 @@ public class BillService implements IBillService {
                 addBillDTO.setPrivateNotes(billOptional.get().getAdminNotes());
                 addBillDTO.setNotes(billOptional.get().getCustomerNotes());
                 addBillDTO.setReferenceNumber(billOptional.get().getReferenceNumber());
-                Optional<Car> carOptional = carRepository.findById(billOptional.get().getCarId());
-                if (carOptional.isPresent()) {
-                    Car car = carOptional.get();
-                    addBillDTO.setCarData(car.getLicenseNumber() + " , " + car.getPlateNumber() + " , " + car.getCreationYear());
+                if(billOptional.get().getCarId() != null) {
+                    Optional<Car> carOptional = carRepository.findById(billOptional.get().getCarId());
+                    if (carOptional.isPresent()) {
+                        Car car = carOptional.get();
+                        addBillDTO.setCarData(car.getLicenseNumber() + " , " + car.getPlateNumber() + " , " + car.getCreationYear());
+                    }
                 }
             }
             returnObject.setData(addBillDTO);

@@ -21,7 +21,7 @@ public class AddBillDTO {
     String date;
     String notes;
     String privateNotes;
-    Integer discount;
+    Double discount;
     Integer billTypeId;
     String referenceNumber;
     Double downPayment;

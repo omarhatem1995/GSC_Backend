@@ -57,7 +57,7 @@ public class CarService implements ICarService {
         if (car.getColor() == null || car.getColor().isEmpty()) {
             messages.add("Color is missing");
         }
-        if (car.getCoveredKilos() == null || car.getCoveredKilos().isEmpty()) {
+        if (car.getCoveredKilos() == null || car.getCoveredKilos().isEmpty() || Integer.valueOf(car.getCoveredKilos()).equals(0)) {
             messages.add("Covered kilometers are missing");
         }
         if (car.getIsPremium() == null) {
@@ -175,7 +175,7 @@ public class CarService implements ICarService {
         }
         if(userId!=null) {
             if (carExists != null) {
-                updateCarDetails(carExists , dto);
+                updateCarDetails(carExists , dto , USER_TYPE);
                 carExists = carRepository.save(carExists);
 
                 ReturnObject returnObject = new ReturnObject();
@@ -206,7 +206,7 @@ public class CarService implements ICarService {
         }
         if(user.getAccountTypeId() == ADMIN_TYPE) {
             if (carExists != null) {
-                updateCarDetails(carExists , dto);
+                updateCarDetails(carExists , dto,ADMIN_TYPE);
                 carExists = carRepository.save(carExists);
 
                 ReturnObject returnObject = new ReturnObject();
@@ -228,9 +228,8 @@ public class CarService implements ICarService {
         }
     }
 
-    private void updateCarDetails(Car carExists, CarDTO dto) {
-        if(dto.getIsPremium() != null)
-        carExists.setIsPremium(dto.getIsPremium());
+    private void updateCarDetails(Car carExists, CarDTO dto,int userType) {
+
         if(dto.getCreationYear() != null)
         carExists.setCreationYear(dto.getCreationYear());
         if(dto.getColor() != null)
@@ -247,8 +246,19 @@ public class CarService implements ICarService {
         carExists.setPlateNumber(dto.getPlateNumber());
         if(dto.getNotes() != null)
         carExists.setNotes(dto.getNotes());
-        if(dto.getExpirationDate() != null && dto.getIsPremium() == 1)
-        carExists.setExpirationDate(String.valueOf(LocalDate.now().plusYears(1)));
+        if(dto.getIsPremium() != null && dto.getIsPremium() == 1) {
+//            carExists.setExpirationDate(String.valueOf(LocalDate.now().plusYears(1)));
+            if(userType == USER_TYPE){
+                if(carExists.getIsPremium() == 0 && carExists.getExpirationDate() == null){
+                    carExists.setExpirationDate(String.valueOf(LocalDate.now().plusYears(1)));
+                    carExists.setIsActivated((byte) 0);
+                }
+            }
+        }else{
+            carExists.setExpirationDate(null);
+        }
+        if(dto.getIsPremium() != null)
+            carExists.setIsPremium(dto.getIsPremium());
 
     }
 

@@ -21,7 +21,8 @@ public class GetProductsDTO {
     private String productDescription;
     private List<Integer> brandIds;
     private List<SellerBrandsDTO> brands;
-    public GetProductsDTO(Integer id, String code, String imageUrl,Double price, Integer brandId,String productName,String productDescription) {
+    public GetProductsDTO(Integer id, String code, String imageUrl,Double price,
+                          Integer brandId,String productName,String productDescription) {
         this.id = id;
         this.code = code;
         this.imageUrl = imageUrl;

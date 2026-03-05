@@ -1,5 +1,6 @@
 package com.gsc.gsc.repo;
 
+import com.gsc.gsc.inventory.dto.ProductWithSellerBrandDTO;
 import com.gsc.gsc.model.Product;
 import com.gsc.gsc.product.dto.GetProductsDTO;
 import org.springframework.data.domain.Page;
@@ -26,23 +27,41 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     long count();
     @Query("SELECT new com.gsc.gsc.product.dto.GetProductsDTO(" +
-            "p.id, p.code, pi.url,p.price,  pd.name, pd.description) " +
+            "p.id, p.code, pi.url,p.price, " +
+            "CASE WHEN :langId = 1 THEN p.nameEn ELSE p.nameAr END," +
+            "CASE WHEN :langId = 1 THEN p.descriptionEn ELSE p.descriptionAr END) " +
             "FROM Product p " +
             "LEFT JOIN ProductImages pi ON p.id = pi.productId AND pi.counter = 1 " +
-            "LEFT JOIN ProductDetails pd ON pd.productId = p.id AND pd.langId = :langId " +
             "WHERE p.id IN (" +
             "   SELECT DISTINCT p1.id " +
             "   FROM Product p1 " +
             "   WHERE p1.id <> 999999" +
             ")")
     Page<GetProductsDTO> findProducts2(@Param("langId") Integer langId, Pageable pageable);
-
+    @Query("SELECT new com.gsc.gsc.inventory.dto.ProductWithSellerBrandDTO(" +
+            "p.id, p.code, p.nameEn, p.nameAr, p.descriptionEn , p.descriptionAr , " +
+            "pb.partNo, pb.price, pb.cost, pb.quantity, " +
+            "sb.id,sb.code, sb.nameEn, sb.nameAr, p.imageUrl) " +
+            "FROM Product p " +
+            "JOIN ProductModelSellerBrand pb ON p.id = pb.productId " +
+            "JOIN SellerBrand sb ON pb.sellerBrandId = sb.id")
+    Page<ProductWithSellerBrandDTO> findProductsWithSellerBrand(Pageable pageable);
+    @Query("SELECT new com.gsc.gsc.inventory.dto.ProductWithSellerBrandDTO(" +
+            "p.id, p.code, p.nameEn, p.nameAr, p.descriptionEn , p.descriptionAr, " +
+            "pb.partNo, pb.price, pb.cost, pb.quantity, " +
+            "sb.id, sb.code, sb.nameEn, sb.nameAr, sb.imageUrl) " +
+            "FROM Product p " +
+            "JOIN ProductModelSellerBrand pb ON p.id = pb.productId " +
+            "JOIN SellerBrand sb ON pb.sellerBrandId = sb.id " +
+            "WHERE sb.id = :sellerBrandId")
+    Page<ProductWithSellerBrandDTO> findProductsBySellerBrandId(@Param("sellerBrandId") Integer sellerBrandId, Pageable pageable);
 
   @Query("SELECT new com.gsc.gsc.product.dto.GetProductsDTO(" +
-          "p.id, p.code, pi.url,p.price, pb.brandId, pd.name, pd.description) " +
+          "p.id, p.code, pi.url,p.price, pb.brandId, " +
+          "CASE WHEN :langId = 1 THEN p.nameEn ELSE p.nameAr END, " +
+          "CASE WHEN :langId = 1 THEN  p.descriptionEn ELSE p.descriptionAr END) " +
           "FROM Product p " +
           "LEFT JOIN ProductImages pi ON p.id = pi.productId AND pi.counter = 1 " +
-          "LEFT JOIN ProductDetails pd ON pd.productId = p.id AND pd.langId = :langId " +
           "LEFT JOIN ProductModel pm ON pm.productId = p.id " +
           "LEFT JOIN Model m ON pm.modelId = m.id " +
           "LEFT JOIN ProductBrand pb ON pb.productId = p.id " +
@@ -62,10 +81,11 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
           Pageable pageable
   );
   @Query("SELECT new com.gsc.gsc.product.dto.GetProductsDTO(" +
-          "p.id, p.code, pi.url,p.price, pb.brandId, pd.name, pd.description) " +
+          "p.id, p.code, pi.url,p.price, pb.brandId," +
+          "CASE WHEN :langId = 1 THEN p.nameEn ELSE p.nameAr END," +
+          "CASE WHEN :langId = 1 THEN p.descriptionEn ELSE p.descriptionAr END) " +
           "FROM Product p " +
           "LEFT JOIN ProductImages pi ON p.id = pi.productId AND pi.counter = 1 " +
-          "LEFT JOIN ProductDetails pd ON pd.productId = p.id AND pd.langId = :langId " +
           "LEFT JOIN ProductModel pm ON pm.productId = p.id " +
           "LEFT JOIN Model m ON pm.modelId = m.id " +
           "LEFT JOIN ProductBrand pb ON pb.productId = p.id " +

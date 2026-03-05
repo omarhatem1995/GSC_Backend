@@ -1,0 +1,11 @@
+{
+  "models": [
+    {
+      "title": "Local Ollama",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "useTools": false
+    }
+  ],
+  "defaultModel": "Local Ollama"
+}

@@ -14,15 +14,19 @@ import com.gsc.gsc.model.*;
 import com.gsc.gsc.repo.*;
 import com.gsc.gsc.user.service.servicesImplementation.UserService;
 import com.gsc.gsc.utilities.FirebaseMessagingService;
+import com.gsc.gsc.utilities.ImgBBService;
 import com.gsc.gsc.utilities.NotificationMessage;
 import com.gsc.gsc.utilities.UniqueCodeGenerator;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -63,6 +67,8 @@ public class JobCardService {
     private FirebaseMessagingService firebaseMessagingService;
     @Autowired
     private BillService billService;
+    @Autowired
+    private ImgBBService imgBBService;
 
     public JobCardService(ModelMapper modelMapper) {
         this.modelMapper = modelMapper;
@@ -240,7 +246,8 @@ public class JobCardService {
 
         if (userId != null) {
             if (userAdmin.getAccountTypeId() == ADMIN_TYPE) {
-                Page<JobCard> jobCardsPage = jobCardRepository.findAll(pageable);
+                Pageable pageable2 = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+                Page<JobCard> jobCardsPage = jobCardRepository.findAll(pageable2);
                 List<GetJobCardsDTO> jobCardDTOs = jobCardsPage.getContent().stream()
                         .map(this::convertToGetJobCardDTO)
                         .collect(Collectors.toList());
@@ -262,51 +269,92 @@ public class JobCardService {
         }
     }
 
-    public ResponseEntity<?> getJobCards(String token, Integer lang) {
+    public ResponseEntity<?> getJobCardsForAdmin(
+            String token,
+            Integer lang,
+            int page,
+            int size,
+            String search   // 👈 Added search parameter
+    ) {
+
         Integer userId = userService.getUserIdFromToken(token);
-        User userAdmin = userRepository.findUserById(userId);
         ReturnObjectPaging returnObject = new ReturnObjectPaging();
 
-        if (userId != null) {
-            if (userAdmin.getAccountTypeId() == ADMIN_TYPE) {
-                List<JobCard> jobCardList = jobCardRepository.findAll();
-                List<GetJobCardsDTO> jobCardDTOs = jobCardList.stream()
-                        .map(this::mapToDto) // Assuming you have a method to convert JobCard to GetJobCardsDTO
-                        .collect(Collectors.toList());
-                for (GetJobCardsDTO getJobCardsDTO : jobCardDTOs) {
-                    List<JobCardNotes> jobCardNotesList = jobCardNotesRepository.findAllByJobCardId(getJobCardsDTO.getId());
-                    List<JobCardNotesDTO> jobCardNotesDTOList = new ArrayList<>();
-                    for (JobCardNotes jobCardNotes : jobCardNotesList) {
-                        if (jobCardNotes.getCreatedBy() != null) {
-                            Optional<User> jobCardCreatedByUser = userRepository.findById(jobCardNotes.getCreatedBy());
-                            if (jobCardCreatedByUser.isPresent()) {
-                                String userType = "User";
-                                if (jobCardCreatedByUser.get().getAccountTypeId().equals(BUSINESS_TYPE) || jobCardCreatedByUser.get().getAccountTypeId().equals(USER_TYPE)) {
-                                    userType = "User";
-                                } else if (jobCardCreatedByUser.get().getAccountTypeId().equals(ADMIN_TYPE)) {
-                                    userType = "Admin";
-                                }
-                                JobCardNotesDTO jobCardNotesDTO = new JobCardNotesDTO(jobCardNotes, jobCardCreatedByUser.get().getName(), userType);
-                                jobCardNotesDTOList.add(jobCardNotesDTO);
-                            }
-                        }
-                    }
-                    getJobCardsDTO.setJobCardNotes(jobCardNotesDTOList);
-                }
-                returnObject.setMessage("Loaded Successfully");
-                returnObject.setData(jobCardDTOs);
-                return ResponseEntity.ok(returnObject);
-            } else {
-                returnObject.setMessage("No Admin");
-                returnObject.setData(jobCardRepository.findAll());
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
-            }
-        } else {
-            // Handle the case where userId is null
+        if (userId == null) {
             returnObject.setMessage("Invalid User");
-            returnObject.setData(new ArrayList<>());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(returnObject);
         }
+
+        User userAdmin = userRepository.findUserById(userId);
+
+        if (userAdmin.getAccountTypeId() != ADMIN_TYPE) {
+            returnObject.setMessage("No Admin");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        // ✅ SEARCH BY CODE ONLY
+        Page<JobCard> jobCardPage;
+
+        if (search != null && !search.trim().isEmpty()) {
+            jobCardPage = jobCardRepository
+                    .findByCodeContainingIgnoreCase(search.trim(), pageable);
+        } else {
+            jobCardPage = jobCardRepository.findAll(pageable);
+        }
+
+        List<GetJobCardsDTO> jobCardDTOs = jobCardPage.getContent()
+                .stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+
+        for (GetJobCardsDTO getJobCardsDTO : jobCardDTOs) {
+
+            List<JobCardNotes> jobCardNotesList =
+                    jobCardNotesRepository.findAllByJobCardId(getJobCardsDTO.getId());
+
+            List<JobCardNotesDTO> jobCardNotesDTOList = new ArrayList<>();
+
+            for (JobCardNotes jobCardNotes : jobCardNotesList) {
+
+                if (jobCardNotes.getCreatedBy() != null) {
+
+                    Optional<User> jobCardCreatedByUser =
+                            userRepository.findById(jobCardNotes.getCreatedBy());
+
+                    if (jobCardCreatedByUser.isPresent()) {
+
+                        String userType =
+                                jobCardCreatedByUser.get().getAccountTypeId().equals(ADMIN_TYPE)
+                                        ? "Admin"
+                                        : "User";
+
+                        JobCardNotesDTO jobCardNotesDTO =
+                                new JobCardNotesDTO(
+                                        jobCardNotes,
+                                        jobCardCreatedByUser.get().getName(),
+                                        userType
+                                );
+
+                        jobCardNotesDTOList.add(jobCardNotesDTO);
+                    }
+                }
+            }
+
+            getJobCardsDTO.setJobCardNotes(jobCardNotesDTOList);
+        }
+
+        returnObject.setMessage("Loaded Successfully");
+        returnObject.setData(jobCardDTOs);
+        returnObject.setTotalCount(jobCardPage.getTotalElements());
+        returnObject.setTotalPages(jobCardPage.getTotalPages());
+
+        return ResponseEntity.ok(returnObject);
     }
 
     private GetJobCardsDTO mapToDto(JobCard jobCard) {
@@ -591,8 +639,106 @@ public class JobCardService {
             return ResponseEntity.ok(returnObject);
         }
     }
+    public ReturnObject createByAdmin(String token, JobCardsDTO jobCardsDTO, List<MultipartFile> images) {
+        Integer userId = userService.getUserIdFromToken(token);
+        User userAdmin = userRepository.findUserById(userId);
+        ReturnObject returnObject = new ReturnObject();
 
-    public ReturnObject createByAdmin(String token, JobCardsDTO jobCardsDTO) {
+        if (userId == null) {
+            returnObject.setMessage("User Doesn't Exist");
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return returnObject;
+        }
+        if(userAdmin != null) {
+            if (userAdmin.getAccountTypeId() != ADMIN_TYPE) {
+                returnObject.setMessage("User Not Admin");
+                returnObject.setStatus(false);
+                returnObject.setData(null);
+                return returnObject;
+            }
+        }else{
+            returnObject.setMessage("Can't find the admin user");
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return returnObject;
+        }
+
+        Optional<Car> carById = carRepository.findById(jobCardsDTO.getCarId());
+        if (carById.isEmpty()) {
+            returnObject.setMessage("Car Doesn't Exist");
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return returnObject;
+        }
+
+        jobCardsDTO.setDate(LocalDate.now().toString());
+        jobCardsDTO.setCode(
+                UniqueCodeGenerator.generateNewJobCardCode(
+                        jobCardRepository.findFirstByOrderByIdDesc().getCode()
+                )
+        );
+
+        JobCard jobCard = new JobCard(jobCardsDTO, PENDING_CUSTOMER_APPROVAL, ADMIN_TYPE);
+        jobCard = jobCardRepository.save(jobCard);
+
+        // ✅ Handle images
+        if (images != null && !images.isEmpty()) {
+            List<String> uploadedUrls = new ArrayList<>();
+            for (MultipartFile image : images) {
+                try {
+                    // Upload to your service, e.g., ImgBB or other
+                    String imageUrl = imgBBService.uploadImage(image);
+                    uploadedUrls.add(imageUrl);
+
+                    // Save image info in JobCardImages table
+                    JobCardImages jobCardImage = new JobCardImages(imageUrl, jobCard.getId());
+                    jobCardImagesRepository.save(jobCardImage);
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            jobCardsDTO.setJobCardsUrl(uploadedUrls);
+        }
+
+        // Handle Other Products
+        if (jobCardsDTO.getOtherProductsDTOList() != null) {
+            for (OtherProductDTO otherProductDTO : jobCardsDTO.getOtherProductsDTOList()) {
+                JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, jobCard.getId(), ADMIN_TYPE);
+                jobCardProductRepository.save(jobCardProduct);
+            }
+        }
+
+        // Handle Product Bills
+        if (jobCardsDTO.getProductBillDTOList() != null) {
+            for (ProductBillDTO productBillDTO : jobCardsDTO.getProductBillDTOList()) {
+                Optional<Product> existingProduct = productRepository.findById(productBillDTO.getId());
+                if (existingProduct.isPresent()) {
+                    JobCardProduct jobCardProduct = new JobCardProduct(productBillDTO, jobCard.getId(), ADMIN_TYPE);
+                    jobCardProductRepository.save(jobCardProduct);
+                } else {
+                    System.out.println("Product with ID " + productBillDTO.getId() + " does not exist.");
+                }
+            }
+        }
+
+        // Handle Notes
+        if (jobCardsDTO.getCustomerNotes() != null && !jobCardsDTO.getCustomerNotes().isEmpty()) {
+            JobCardNotes notes = new JobCardNotes(userId, jobCardsDTO.getCustomerNotes(), false, jobCard.getId());
+            jobCardNotesRepository.save(notes);
+        }
+        if (jobCardsDTO.getPrivateNotes() != null && !jobCardsDTO.getPrivateNotes().isEmpty()) {
+            JobCardNotes privateNotes = new JobCardNotes(userId, jobCardsDTO.getPrivateNotes(), true, jobCard.getId());
+            jobCardNotesRepository.save(privateNotes);
+        }
+
+        returnObject.setMessage("New Job Card Created Successfully");
+        returnObject.setStatus(true);
+        returnObject.setData(jobCard);
+        return returnObject;
+    }
+  /*  public ReturnObject createByAdmin(String token, JobCardsDTO jobCardsDTO) {
         Integer userId = userService.getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
         ReturnObject returnObject = new ReturnObject();
@@ -677,7 +823,7 @@ public class JobCardService {
 
         }
         return returnObject;
-    }
+    }*/
 
     public ReturnObject updateByAdmin(String token, JobCardsDTO jobCardsDTO, Integer jobCardId) {
         Integer userId = userService.getUserIdFromToken(token);
@@ -701,7 +847,12 @@ public class JobCardService {
                     } else if (existingJobCard.getJobCardStatusId().equals(APPROVED)) {
                         existingJobCard.setJobCardStatusId(COMPLETED); //Completed
                         //Create Invoice
-                        billService.createJobCardBill(jobCardsDTO.getUserId(), existingJobCard);
+                        if (!billService.checkExistingInvoice(existingJobCard)) {
+                            billService.createJobCardBill(jobCardsDTO.getUserId(), existingJobCard);
+                        }else{
+                            returnObject.setMessage("Invoice Already Created");
+                            returnObject.setStatus(false);
+                        }
                     }
                     // Save updated job card
                     jobCardRepository.save(existingJobCard);
@@ -800,7 +951,12 @@ public class JobCardService {
                     // Update job card properties
                     existingJobCard.setJobCardStatusId(COMPLETED); //Completed
                     //Create Invoice
-                    billService.createJobCardBill(existingJobCard.getUserId(), existingJobCard);
+                    if (!billService.checkExistingInvoice(existingJobCard)) {
+                        billService.createJobCardBill(existingJobCard.getUserId(), existingJobCard);
+                    }else{
+                        returnObject.setMessage("Invoice Already Created");
+                        returnObject.setStatus(false);
+                    }
                     // Save updated job card
                     jobCardRepository.save(existingJobCard);
 
@@ -912,13 +1068,13 @@ public class JobCardService {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
                 }
             } else {
-                returnObject.setMessage("No Job Card with ID : " + jobCardId + " is Found");
+                returnObject.setMessage("No Job Card is not Found");
                 returnObject.setStatus(false);
                 returnObject.setData(null);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
             }
         } else {
-            returnObject.setMessage("No Job Card with ID : " + jobCardId + " is Found");
+            returnObject.setMessage("No Job Card is not Found");
             returnObject.setStatus(false);
             returnObject.setData(null);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(returnObject);

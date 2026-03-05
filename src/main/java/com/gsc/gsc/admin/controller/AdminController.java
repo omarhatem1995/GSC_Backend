@@ -1,11 +1,11 @@
 package com.gsc.gsc.admin.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gsc.gsc.admin.dto.ActivateCarDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
 import com.gsc.gsc.admin.service.serviceImplementation.AdminService;
-import com.gsc.gsc.bill.service.serviceInterface.BillService;
 import com.gsc.gsc.bill.dto.AddBillDTO;
-import com.gsc.gsc.bill.dto.BillStatusDTO;
+import com.gsc.gsc.bill.service.serviceInterface.BillService;
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.car.service.serviceImplementation.CarService;
 import com.gsc.gsc.constants.ReturnObject;
@@ -20,6 +20,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.List;
 
 import static com.gsc.gsc.utilities.Utilities.getLangId;
 
@@ -42,50 +46,63 @@ public class AdminController {
     JwtUtil jwtUtil;
 
     @PostMapping("activate_car")
-    public ResponseEntity updateCarStats(@RequestHeader("Authorization") String token ,@RequestBody ActivateCarDTO activateCarDTO) {
+    public ResponseEntity updateCarStats(@RequestHeader("Authorization") String token, @RequestBody ActivateCarDTO activateCarDTO) {
         return adminService.activateCar(token, activateCarDTO);
     }
 
     @GetMapping("all_job_cards")
     private ResponseEntity getJobCards(
             @RequestHeader("Authorization") String token,
-            @RequestHeader("Accept-Language") String lang,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestHeader(value = "Accept-Language", required = false) String lang,
+            @RequestParam(defaultValue = "0", required = false) int page,
+            @RequestParam(defaultValue = "10", required = false) int size) {
 
         Pageable pageable = PageRequest.of(page, size);
         return jobCardService.getJobCards(token, getLangId(lang), pageable);
     }
-    @GetMapping("all_job_cards_without_paging")
-    private ResponseEntity getJobCards(
-            @RequestHeader("Authorization") String token,
-            @RequestHeader("Accept-Language") String lang) {
 
-        return jobCardService.getJobCards(token, getLangId(lang));
+    @GetMapping("all_job_cards_without_paging")
+    private ResponseEntity getJobCardsForAdmin(
+            @RequestHeader("Authorization") String token,
+            @RequestHeader(value = "Accept-Language", required = false) String lang,
+            @RequestParam(defaultValue = "0", required = false) int page,
+            @RequestParam(defaultValue = "10", required = false) int size,
+            @RequestParam(defaultValue = "", required = false) String searchQuery) {
+
+        return jobCardService.getJobCardsForAdmin(token, getLangId(lang),page,size,searchQuery);
     }
 
     @GetMapping("all_users")
-    private ResponseEntity getAllUsers(@RequestHeader("Authorization") String token){
+    private ResponseEntity getAllUsers(@RequestHeader("Authorization") String token) {
         return adminService.getAllUsersForAdmin(token);
     }
 
     @GetMapping("user/{userId}")
-    private ResponseEntity getUserById(@RequestHeader("Authorization") String token , @PathVariable Integer userId){
-        return adminService.getUserById(token,userId);
-    }
-    @GetMapping("all_cars")
-    private ResponseEntity getAllCars(@RequestHeader("Authorization") String token){
-        return adminService.getAllCarsForAdmin(token);
-    }
-    @GetMapping("all_cars_by_user_id")
-    private ResponseEntity getAllCarsByUserIdForAdmin(@RequestHeader("Authorization") String token , @RequestParam("userId") Integer userId){
-        return adminService.getAllCarsByUserIdForAdmin(token,userId);
+    private ResponseEntity getUserById(@RequestHeader("Authorization") String token, @PathVariable Integer userId) {
+        return adminService.getUserById(token, userId);
     }
 
-    @PostMapping(value = "/job_card", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<ReturnObject> addJobCardByAdmin(@RequestHeader("Authorization") String token, @RequestBody JobCardsDTO jobCardsDTO) {
-        ReturnObject returnObject = jobCardService.createByAdmin(token, jobCardsDTO);
-        return ResponseEntity.status(returnObject.isStatus() ? HttpStatus.OK : HttpStatus.FORBIDDEN).body(returnObject);
+    @GetMapping("all_cars")
+    private ResponseEntity getAllCars(@RequestHeader("Authorization") String token) {
+        return adminService.getAllCarsForAdmin(token);
+    }
+
+    @GetMapping("all_cars_by_user_id")
+    private ResponseEntity getAllCarsByUserIdForAdmin(@RequestHeader("Authorization") String token, @RequestParam("userId") Integer userId) {
+        return adminService.getAllCarsByUserIdForAdmin(token, userId);
+    }
+
+    @PostMapping(value = "/job_card", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ReturnObject> addJobCardByAdmin(
+            @RequestHeader("Authorization") String token,
+            @RequestPart("jobCard") JobCardsDTO jobCardsDTO,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
+    ) throws IOException {
+
+        ReturnObject returnObject = jobCardService.createByAdmin(token, jobCardsDTO, images);
+
+        return ResponseEntity.status(returnObject.isStatus() ? HttpStatus.OK : HttpStatus.FORBIDDEN)
+                .body(returnObject);
     }
 
     @PutMapping("/job_card/{jobCardId}")
@@ -95,6 +112,7 @@ public class AdminController {
         ReturnObject returnObject = jobCardService.updateByAdmin(token, jobCardsDTO, jobCardId);
         return ResponseEntity.status(returnObject.isStatus() ? HttpStatus.OK : HttpStatus.FORBIDDEN).body(returnObject);
     }
+
     @PutMapping("/job_card/submit/{jobCardId}")
     public ResponseEntity<ReturnObject> submitJobCardByAdmin(@RequestHeader("Authorization") String token,
                                                              @PathVariable Integer jobCardId) {
@@ -103,8 +121,11 @@ public class AdminController {
     }
 
     @PostMapping(value = "bill", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity addBillByAdmin(@RequestHeader("Authorization") String token ,@RequestBody AddBillDTO billDTO) {
-        return billService.createBillByAdmin(token , billDTO);
+    public ResponseEntity addBillByAdmin(@RequestHeader("Authorization") String token,
+                                         @RequestParam(required = false) String macAddress,
+                                         @RequestParam(required = false) String mobileVersion,
+                                         @RequestBody AddBillDTO billDTO) {
+        return billService.createBillByAdmin(token, macAddress, mobileVersion, billDTO);
     }
 
     @PutMapping(value = "bill/{billId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -113,47 +134,52 @@ public class AdminController {
                                             @PathVariable Integer billId) {
         return billService.updateBillByAdmin(token, billDTO, billId);
     }
-    @PutMapping(value = "billStatus/{billId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+
+    @PutMapping(value = "billStatus/{billId}")
     public ResponseEntity updateBillStatus(@RequestHeader("Authorization") String token,
-                                            @PathVariable Integer billId) {
+                                           @PathVariable Integer billId) {
         return billService.updateBillStatus(token, billId);
     }
 
     @PostMapping("send_fcm")
-    public ResponseEntity sendNotificationToUser(@RequestHeader("Authorization") String token,@RequestBody NotificationDTO notificationDTO) {
-        return adminService.sendNotificationByAdmin(token,notificationDTO);
+    public ResponseEntity sendNotificationToUser(@RequestHeader("Authorization") String token, @RequestBody NotificationDTO notificationDTO) {
+        return adminService.sendNotificationByAdmin(token, notificationDTO);
     }
 
     @GetMapping("all_bills")
     public ResponseEntity getAllUsersBillByToken(
-            @RequestHeader("Accept-Language") String langId,
+            @RequestHeader(value = "Accept-Language", required = false) String langId,
             @RequestHeader("Authorization") String token,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0", required = false) int page,
+            @RequestParam(defaultValue = "10", required = false) int size,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) String search) {
 
         Pageable pageable = PageRequest.of(page, size);
-        return billService.getBillsForAdminByToken(token, getLangId(langId), pageable);
+        return billService.getBillsForAdminByToken(token, userId, search, getLangId(langId), pageable);
     }
+
     @DeleteMapping("car/{id}")
     public ResponseEntity deleteCar(@RequestHeader("Authorization") String token,
                                     @PathVariable Integer id) {
-        return carService.deleteCarByAdmin(token,id);
+        return carService.deleteCarByAdmin(token, id);
     }
-    @PutMapping("billStatus/{billId}")
-    public ResponseEntity<?> changeBillStatus(@RequestHeader("Authorization") String token,
-                                              @PathVariable Integer billId,
-                                              @RequestBody BillStatusDTO billStatusDTO){
-        return billService.changeBillStatus(token,billId,billStatusDTO);
-    }
+
+    /*    @PutMapping("billStatus/{billId}")
+        public ResponseEntity<?> changeBillStatus(@RequestHeader("Authorization") String token,
+                                                  @PathVariable Integer billId,
+                                                  @RequestBody BillStatusDTO billStatusDTO){
+            return billService.changeBillStatus(token,billId,billStatusDTO);
+        }*/
     @PostMapping("addCar/{userId}")
     public ResponseEntity<?> addCarByAdmin(@RequestHeader("Authorization") String token,
-                                              @PathVariable Integer userId,
-                                          @RequestBody CarDTO carDTO){
-        return carService.addCarByAdmin(token, userId,carDTO);
+                                           @PathVariable Integer userId,
+                                           @RequestBody CarDTO carDTO) {
+        return carService.addCarByAdmin(token, userId, carDTO);
     }
     /*
 
 
-*/
+     */
 //        return carService.addToFavourite(token,invoiceProductRepository.getProductId());
 }

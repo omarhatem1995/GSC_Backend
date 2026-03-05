@@ -60,11 +60,16 @@ public class UserService implements IUserService {
     Matcher matcher ;
     public ResponseEntity getUserByToken(String token) {
         Integer userIdFromToken =  getUserIdFromToken(token);
-        ReturnObject returnObject = new ReturnObject();
-        returnObject.setMessage("Success");
-        returnObject.setStatus(true);
-        returnObject.setData(userRepository.findUserById(userIdFromToken));
-        return ResponseEntity.ok(returnObject);
+        if(userIdFromToken != null ) {
+            User user = userRepository.findUserById(userIdFromToken);
+            ReturnObject returnObject = new ReturnObject();
+            returnObject.setMessage("Success");
+            returnObject.setStatus(true);
+            returnObject.setData(user);
+            return ResponseEntity.ok(returnObject);
+        }else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
     }
 
     public ResponseEntity<?> findPointsByToken(String token){
@@ -103,12 +108,12 @@ public class UserService implements IUserService {
         }
         userDTO.setPhone(cleanMobileNumber(userDTO.getPhone()));
         Optional<User> userOptional = userRepository.findOptionalByPhone(userDTO.getPhone());
-        if(userDTO.getMail()==null){
+/*        if(userDTO.getMail()==null){
             returnObject.setMessage("Mail is Mandatory");
             returnObject.setStatus(false);
             returnObject.setData(null);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
-        }
+        }*/
         if(userOptional.isPresent()) {
             User user = userOptional.get();
             if(user.getVerificationOTP().trim().equals(userDTO.getVerificationOTP().trim())) {
@@ -158,18 +163,18 @@ public class UserService implements IUserService {
         }else{
             userDTO.setPhone(cleanMobileNumber(userDTO.getPhone()));
         }
-        if(userDTO.getMail() == null){
+/*        if(userDTO.getMail() == null){
                 returnObject.setStatus(false);
                 returnObject.setMessage("Mail can't be empty");
                 returnObject.setData(userDTO);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
-        }
-        User userExists = userRepository.findByMailAndPhone(userDTO.getMail(),userDTO.getPhone());
+        }*/
+        User userExists = userRepository.findByPhone(userDTO.getPhone());
         if(userExists != null) {
             User user = userExists;
             String otp = generateOtp();
             user.setVerificationOTP(otp);
-            emailService.sendOtpEmail(user.getMail(), otp);
+//            emailService.sendOtpEmail(user.getMail(), otp);
             user = userRepository.save(user);
             userDTO.setId(user.getId());
         }
@@ -228,6 +233,7 @@ public class UserService implements IUserService {
             user = userRepository.save(user);
             userDTO.setId(user.getId());
             userDTO.setToken(jwtTokenUtil.generateToken(user.getId(),USER_TYPE,tokenExpiryTime));
+            userDTO.setIsVerified(user.getIsVerified());
 
             returnObject.setMessage("New User Created Successfully");
             returnObject.setData(userDTO);

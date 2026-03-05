@@ -33,7 +33,7 @@ public class BillController {
     public ResponseEntity<ReturnObject> generateBillPdf(@RequestHeader("Authorization") String token, @PathVariable int billId, @RequestParam String macAddress,
                                                         @RequestParam(value = "includePrivateNotes",required = false) Boolean includePrivateNotes) throws IOException {
         // Locate your PDF file
-        ReturnObject returnObject = billPdfGeneratorITextService.exportIText(token,billId, macAddress,includePrivateNotes);
+        ReturnObject returnObject = billPdfGeneratorITextService.exportIText2(token,billId, macAddress,includePrivateNotes);
 
         if (returnObject.isStatus()) {
             Object data = returnObject.getData();
@@ -101,5 +101,18 @@ public class BillController {
                                            @PathVariable Integer billId,
                                            @RequestBody AddJobCardNotes addJobCardNotes){
         return billService.addCustomerNotes(token,billId,addJobCardNotes);
+    }
+
+    @GetMapping("allBills")
+    public ResponseEntity<?> getBills(
+            @RequestHeader("Accept-Language") String langId,
+            @RequestHeader("Authorization") String token,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Integer userId,   // optional
+            @RequestParam(required = false) String search) {
+
+        Pageable pageable = PageRequest.of(page, size);
+        return billService.getBills(token, userId, search, getLangId(langId), pageable);
     }
 }

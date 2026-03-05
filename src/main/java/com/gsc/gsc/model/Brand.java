@@ -17,17 +17,21 @@ public class Brand {
     @Id
     @Column(name = "id")
     private int id;
-    @Basic
     @Column(name = "code")
     private String code;
-    @Basic
     @Column(name = "created_at")
     private Timestamp createdAt;
-    @Basic
     @Column(name = "updated_at")
     private Timestamp updatedAt;
-    @Basic
     @Column(name = "image_url")
     private String imageUrl;
+    @Column(name = "name_en")
+    private String nameEn;
+    @Column(name = "name_ar")
+    private String nameAr;
+    @Column(name = "description_en")
+    private String descriptionEn;
+    @Column(name = "description_ar")
+    private String descriptionAr;
 
 }

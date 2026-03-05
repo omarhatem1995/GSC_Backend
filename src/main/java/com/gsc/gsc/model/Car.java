@@ -73,9 +73,6 @@ public class Car {
     this.chassisNumber = carDTO.getChassisNumber();
     this.isDeleted = false;
     this.createdBy = carDTO.getCreatedBy();
-    if(carDTO.getIsPremium() == 1){
-            this.expirationDate = carDTO.getExpirationDate();
-        }
     }
 
     public Car(CarDTO carDTO) {
@@ -93,8 +90,5 @@ public class Car {
         this.chassisNumber = carDTO.getChassisNumber();
         this.isDeleted = false;
         this.createdBy = carDTO.getCreatedBy();
-        if(carDTO.getIsPremium() == 1){
-            this.expirationDate = carDTO.getExpirationDate();
-        }
     }
 }

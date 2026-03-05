@@ -21,7 +21,7 @@ public class GetBillsDTO {
     String billStatusTypeCode;
     Integer createdBy;
     Double total;
-    Integer discount;
+    Double discount;
     Date createdAt;
     String adminNotes;
     String customerNotes;

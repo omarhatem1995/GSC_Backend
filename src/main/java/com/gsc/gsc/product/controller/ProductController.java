@@ -6,10 +6,14 @@ import com.gsc.gsc.product.dto.ProductDTO;
 import com.gsc.gsc.product.service.serviceImplementation.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import org.springframework.data.domain.Pageable;
+
+import java.io.IOException;
+
 import static com.gsc.gsc.utilities.Utilities.getLangId;
 
 @CrossOrigin(origins = "*")
@@ -20,9 +24,9 @@ public class ProductController {
     @Autowired
     ProductService productService;
 
-    @PostMapping("admin")
-    public ResponseEntity addProduct(@RequestHeader("Authorization") String token ,@RequestBody ProductDTO productDTO) {
-        return productService.create(token,productDTO);
+    @PostMapping(value = "/admin", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity addProduct(@RequestHeader("Authorization") String token ,@ModelAttribute ProductDTO dto) throws IOException {
+        return productService.create(token,dto);
     }
     @PutMapping("admin/{productId}")
     public ResponseEntity updateProduct(@RequestHeader("Authorization") String token,
@@ -36,7 +40,7 @@ public class ProductController {
     }
     @PostMapping("")
     public ResponseEntity getProducts(@RequestHeader("Authorization") String token,
-                                      @RequestHeader("Accept-Language") String langId,
+                                      @RequestHeader(value = "Accept-Language",required = false) String langId,
                                       @RequestBody PagingClass request) {
         Pageable pageable = PageRequest.of(request.getPageNumber(), request.getPageSize());
         return productService.getProducts(token, getLangId(langId), pageable);

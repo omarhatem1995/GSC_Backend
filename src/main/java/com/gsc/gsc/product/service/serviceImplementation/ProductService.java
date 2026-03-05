@@ -11,18 +11,19 @@ import com.gsc.gsc.product.service.serviceInterface.IProductService;
 import com.gsc.gsc.repo.*;
 import com.gsc.gsc.seller_brand.SellerBrandsDTO;
 import com.gsc.gsc.utilities.FirebaseMessagingService;
+import com.gsc.gsc.utilities.ImgBBService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import org.springframework.data.domain.Pageable;
 
+import java.io.IOException;
 import java.util.*;
 
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
@@ -55,8 +56,6 @@ public class ProductService implements IProductService {
     @Autowired
     private StoreRepository storeRepository;
     @Autowired
-    private ProductDetailsRepository productDetailsRepository;
-    @Autowired
     private BillProductRepository billProductRepository;
     @Autowired
     private ProductSellerBrandRepository productSellerBrandRepository;
@@ -72,6 +71,11 @@ public class ProductService implements IProductService {
     private SellerBrandRepository sellerBrandRepository;
     @Autowired
     private FirebaseMessagingService firebaseMessagingService;
+
+    @Autowired
+    private  ImgBBService imgBBService;
+    @Autowired
+    private ProductImagesRepository productImagesRepository;
 
     @Override
     public Optional<Car> getById(Integer id) {
@@ -105,7 +109,7 @@ public class ProductService implements IProductService {
     }
 
     @Override
-    public ResponseEntity create(String token , ProductDTO dto) {
+    public ResponseEntity create(String token , ProductDTO dto) throws IOException {
         ReturnObject returnObject = new ReturnObject();
         Integer userId = getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
@@ -134,6 +138,8 @@ public class ProductService implements IProductService {
             }
             Optional<Store> storeOptional = storeRepository.findById(dto.getStoreId());
             if(storeOptional.isPresent()) {
+
+
                 Product product = new Product();
                 ProductStore productStore = new ProductStore();
 
@@ -144,8 +150,17 @@ public class ProductService implements IProductService {
 //                updateForeignKeys(product, dto);
 
                 product = productRepository.save(product);
+                if (dto.getImage() != null && !dto.getImage().isEmpty()) {
 
-                updateLanguage(product.getId(),dto);
+                    String imageUrl = imgBBService.uploadImage(dto.getImage());
+
+                    ProductImages productImage = new ProductImages();
+                    productImage.setProductId(product.getId());
+                    productImage.setUrl(imageUrl);
+                    productImage.setCounter(1);
+
+                    productImagesRepository.save(productImage);
+                }
 
                 productStore.setProductId(product.getId());
                 productStore.setStoreId(dto.getStoreId());
@@ -214,23 +229,6 @@ public class ProductService implements IProductService {
 
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
         }
-    }
-
-    private void updateLanguage(Integer productId ,ProductDTO productDTO) {
-        ProductDetails productDetailsEn = new ProductDetails();
-        ProductDetails productDetailsAr = new ProductDetails();
-        productDetailsEn.setProductId(productId);
-        productDetailsEn.setName(productDTO.getProductNameEn());
-        productDetailsEn.setDescription(productDTO.getProductDescriptionEn());
-        productDetailsEn.setLangId(ENGLISH);
-
-        productDetailsAr.setProductId(productId);
-        productDetailsAr.setName(productDTO.getProductNameAr());
-        productDetailsAr.setDescription(productDTO.getProductDescriptionAr());
-        productDetailsAr.setLangId(ARABIC);
-
-        productDetailsRepository.save(productDetailsEn);
-        productDetailsRepository.save(productDetailsAr);
     }
 
     public ResponseEntity<?> findOENumbersByBrandAndProductIds(OeNumber oeNumber){
@@ -482,9 +480,6 @@ public class ProductService implements IProductService {
 
                     // Save the updated product
                     existingProduct = productRepository.save(existingProduct);
-
-                    // Update language information
-                    updateLanguage(existingProduct.getId(), dto);
 
                     // Update information in the product store
                     Optional<ProductStore> productStoreOptional = productStoreRepository.findByProductId(existingProduct.getId());

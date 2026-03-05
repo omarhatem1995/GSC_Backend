@@ -17,20 +17,18 @@ public class Model {
     @Id
     @Column(name = "id")
     private Integer id;
-    @Basic
     @Column(name = "code")
     private String code;
-    @Basic
+    @Column(name = "name_en")
+    private String nameEn;
+    @Column(name = "name_ar")
+    private String nameAr;
     @Column(name = "created_at")
     private Timestamp createdAt;
-    @Basic
     @Column(name = "updated_at")
     private Timestamp updatedAt;
-    @Basic
     @Column(name = "creation_year")
     private Integer creationYear;
-    @Basic
     @Column(name = "brand_id")
     private Integer brandId;
-
 }
