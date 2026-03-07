@@ -1,15 +1,19 @@
 package com.gsc.gsc.admin.service.serviceImplementation;
 
+import com.google.api.Http;
 import com.gsc.gsc.admin.dto.ActivateCarDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
 import com.gsc.gsc.admin.service.serviceInterface.IAdminService;
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.car.dto.UsersCarsDTO;
 import com.gsc.gsc.constants.ReturnObject;
+import com.gsc.gsc.constants.ReturnObjectPaging;
 import com.gsc.gsc.model.Car;
 import com.gsc.gsc.model.Notification;
+import com.gsc.gsc.model.Point;
 import com.gsc.gsc.model.User;
 import com.gsc.gsc.repo.*;
+import com.gsc.gsc.user.dto.GetAllUsers;
 import com.gsc.gsc.user.security.util.JwtUtil;
 import com.gsc.gsc.user.service.servicesImplementation.UserService;
 import com.gsc.gsc.utilities.FirebaseMessagingService;
@@ -20,6 +24,10 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -29,6 +37,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 
@@ -53,6 +62,8 @@ public class AdminService implements IAdminService {
     private String SECRET_KEY;
     @Autowired
     private ModelRepository modelRepository;
+    @Autowired
+    private PointRepository pointRepository;
 
     @Override
     public Optional<Car> getById(Integer id) {
@@ -64,40 +75,88 @@ public class AdminService implements IAdminService {
         return null;
     }
 
-    public ResponseEntity getAllUsersForAdmin(String token) {
-        ReturnObject returnObject = new ReturnObject();
+
+    public ResponseEntity<ReturnObjectPaging> getAllUsersForAdmin(
+            String token,
+            String name,
+            String phone,
+            Integer accountTypeId, // ADMIN_TYPE or CUSTOMER_TYPE
+            int page,
+            int size
+    ) {
+        ReturnObjectPaging returnObject = new ReturnObjectPaging();
         try {
             Integer userIdFromToken = getUserIdFromToken(token);
-            if (userRepository.findUserById(userIdFromToken).getAccountTypeId() == ADMIN_TYPE) {
-                returnObject.setMessage("Success");
-                returnObject.setData(userRepository.findAllExceptAdmins());
-                returnObject.setStatus(true);
-                return ResponseEntity.ok(returnObject);
-            } else {
-                returnObject.setMessage("This user is not Authorized");
+            User currentUser = userRepository.findById(userIdFromToken).orElse(null);
+
+            if (currentUser == null || !currentUser.getAccountTypeId().equals(ADMIN_TYPE)) {
+                returnObject.setMessage("This user is not authorized");
                 returnObject.setStatus(false);
                 returnObject.setData(null);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
             }
+
+            Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+            Page<User> users = userRepository.findAllWithFilters(accountTypeId, name, phone, pageable);
+
+            List<GetAllUsers> result = users.getContent().stream().map(user -> {
+
+                GetAllUsers dto = new GetAllUsers();
+
+                dto.setId(user.getId());
+                dto.setName(user.getName());
+                dto.setAccountTypeId(user.getAccountTypeId());
+                dto.setMail(user.getMail());
+                dto.setCommercialRegistry(user.getCommercialRegistry());
+                dto.setCommercialLicense(user.getCommercialLicense());
+                dto.setEstablishmentRegistration(user.getEstablishmentRegistration());
+                dto.setTaxCard(user.getTaxCard());
+                dto.setMailbox(user.getMailbox());
+                dto.setAddress(user.getAddress());
+                dto.setPhone(user.getPhone());
+                dto.setIsActive(user.getIsActive());
+
+                // calculate points
+                List<Point> points = pointRepository.findAllByUserId(user.getId());
+
+                long totalPoints = 0;
+
+                for (Point p : points) {
+                    if (p.getOperationType() == 1) {
+                        totalPoints += p.getPointsNumber();
+                    } else if (p.getOperationType() == 2) {
+                        totalPoints -= p.getPointsNumber();
+                    }
+                }
+
+                dto.setPoints(totalPoints);
+
+                return dto;
+
+            }).collect(Collectors.toList());
+
+            returnObject.setMessage("Success");
+            returnObject.setStatus(true);
+            returnObject.setData(result);
+            returnObject.setTotalCount(users.getTotalElements());
+            returnObject.setTotalPages(users.getTotalPages());
+            return ResponseEntity.ok(returnObject);
+
         } catch (ExpiredJwtException e) {
-            // Handle expired token
-            System.out.println("JWT has expired: " + e.getMessage());
             returnObject.setMessage("JWT has expired: " + e.getMessage());
             returnObject.setStatus(false);
             returnObject.setData(null);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
 
-            // Handle the expired token case (e.g., by logging, notifying the user, etc.)
         } catch (JwtException e) {
-            // Handle other JWT exceptions
-            System.out.println("JWT processing error: " + e.getMessage());
-            returnObject.setMessage("JWT has expired: " + e.getMessage());
+            returnObject.setMessage("JWT processing error: " + e.getMessage());
             returnObject.setStatus(false);
             returnObject.setData(null);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
-            // Handle the case where the token is invalid or some other JWT error occurs
         }
     }
+
 
     public ResponseEntity getAllCarsForAdmin(String token) {
         Integer userIdFromToken = getUserIdFromToken(token);
@@ -296,4 +355,45 @@ public class AdminService implements IAdminService {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
     }
+
+    public ResponseEntity<?> activateUserById(String token, Integer userId) {
+        ReturnObject returnObject = new ReturnObject();
+        if (token != null) {
+            Integer adminId = getUserIdFromToken(token);
+            User userAdmin = userRepository.findUserById(adminId);
+            if (userAdmin.getAccountTypeId() == ADMIN_TYPE) {
+                User user = userRepository.findUserById(userId);
+                if (user == null) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("User not found");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+                }
+                if (user.getIsActive() == 1) {
+                    user.setIsActive(0);
+                    userRepository.save(user);
+                    returnObject.setMessage("DeActivated User Successfully");
+                    returnObject.setStatus(true);
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+                }
+                user.setIsActive(1);
+                userRepository.save(user);
+                returnObject.setMessage("Activated User Successfully");
+                returnObject.setStatus(true);
+                returnObject.setData(null);
+                return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+            } else {
+                returnObject.setStatus(false);
+                returnObject.setMessage("Can't change user status with non admin user");
+                returnObject.setData(null);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+            }
+        }
+        returnObject.setStatus(false);
+        returnObject.setMessage("Can't change user status with non admin user");
+        returnObject.setData(null);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+    }
+
 }

@@ -28,6 +28,8 @@ public class JobCardNotes {
     private Boolean isPrivate = false;
     @Column(name = "customer_mobile_version")
     private String customerMobileVersion;
+    @Column(name = "customer_mobile_mac_address")
+    private String customerMobileMacAddress;
     @Column(name = "approved_by_customer_at")
     private Timestamp approvedByCustomerAt;
     @Column(name = "created_at")

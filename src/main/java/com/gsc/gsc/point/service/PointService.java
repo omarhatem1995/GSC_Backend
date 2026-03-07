@@ -34,7 +34,7 @@ public class PointService {
         User user = userRepository.findUserById(userId);
         if (user != null) {
             addPointsDTO.setUserId(userId);
-            Point point = new Point(addPointsDTO);
+            Point point = new Point(addPointsDTO,adminId);
 
             pointRepository.save(point);
 

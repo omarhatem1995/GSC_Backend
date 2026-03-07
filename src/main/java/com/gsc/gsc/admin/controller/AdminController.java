@@ -1,6 +1,5 @@
 package com.gsc.gsc.admin.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gsc.gsc.admin.dto.ActivateCarDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
 import com.gsc.gsc.admin.service.serviceImplementation.AdminService;
@@ -69,12 +68,24 @@ public class AdminController {
             @RequestParam(defaultValue = "10", required = false) int size,
             @RequestParam(defaultValue = "", required = false) String searchQuery) {
 
-        return jobCardService.getJobCardsForAdmin(token, getLangId(lang),page,size,searchQuery);
+        return jobCardService.getJobCardsForAdmin(token, getLangId(lang), page, size, searchQuery);
     }
 
-    @GetMapping("all_users")
-    private ResponseEntity getAllUsers(@RequestHeader("Authorization") String token) {
-        return adminService.getAllUsersForAdmin(token);
+    @GetMapping("/all_users")
+    public ResponseEntity<?> getAllUsers(
+            @RequestHeader("Authorization") String token,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) Integer accountType,   // ADMIN or CUSTOMER
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        return adminService.getAllUsersForAdmin(token, name, phoneNumber, accountType, page, size);
+    }
+
+    @PutMapping("activate/{userId}")
+    private ResponseEntity<?> activateUser(@RequestHeader("Authorization") String token, @PathVariable Integer userId){
+        return adminService.activateUserById(token, userId);
     }
 
     @GetMapping("user/{userId}")
@@ -105,11 +116,11 @@ public class AdminController {
                 .body(returnObject);
     }
 
-    @PutMapping("/job_card/{jobCardId}")
+    @PostMapping(value ="/job_card/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ReturnObject> updateJobCardByAdmin(@RequestHeader("Authorization") String token,
-                                                             @RequestBody JobCardsDTO jobCardsDTO,
-                                                             @PathVariable Integer jobCardId) {
-        ReturnObject returnObject = jobCardService.updateByAdmin(token, jobCardsDTO, jobCardId);
+                                                             @RequestPart("jobCard") JobCardsDTO jobCardsDTO,
+                                                             @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        ReturnObject returnObject = jobCardService.updateByAdmin(token, jobCardsDTO, jobCardsDTO.getJobCardId(), images);
         return ResponseEntity.status(returnObject.isStatus() ? HttpStatus.OK : HttpStatus.FORBIDDEN).body(returnObject);
     }
 

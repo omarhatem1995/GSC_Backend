@@ -12,4 +12,5 @@ public class AddPointsDTO {
     private Integer userId;
     private Integer points;
     private String reason;
+    private Integer operationType;
 }

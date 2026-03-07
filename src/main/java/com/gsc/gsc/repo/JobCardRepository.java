@@ -22,4 +22,7 @@ public interface JobCardRepository extends JpaRepository<JobCard, Integer> {
     JobCard findLatestJobCard();
 
     JobCard findFirstByOrderByIdDesc();
+    Page<JobCard> findAllByUserId(Integer userId, Pageable pageable);
+
+    Page<JobCard> findByUserIdAndCodeContainingIgnoreCase(Integer userId, String code, Pageable pageable);
 }

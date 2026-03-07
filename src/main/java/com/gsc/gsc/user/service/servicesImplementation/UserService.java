@@ -118,6 +118,7 @@ public class UserService implements IUserService {
             User user = userOptional.get();
             if(user.getVerificationOTP().trim().equals(userDTO.getVerificationOTP().trim())) {
                 user.setIsVerified(true);
+                user.setIsActive(1);
                 userRepository.save(user);
                 returnObject.setData(user);
                 returnObject.setStatus(true);
@@ -140,6 +141,7 @@ public class UserService implements IUserService {
     public void verifyUser(String phone){
         User user = userRepository.findByPhone(phone);
         user.setIsVerified(true);
+        user.setIsActive(1);
         userRepository.save(user);
     }
     private String generateOtp() {
@@ -234,6 +236,7 @@ public class UserService implements IUserService {
             userDTO.setId(user.getId());
             userDTO.setToken(jwtTokenUtil.generateToken(user.getId(),USER_TYPE,tokenExpiryTime));
             userDTO.setIsVerified(user.getIsVerified());
+            userDTO.setIsActive(user.getIsActive());
 
             returnObject.setMessage("New User Created Successfully");
             returnObject.setData(userDTO);

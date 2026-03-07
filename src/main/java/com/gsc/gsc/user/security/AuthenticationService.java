@@ -73,6 +73,13 @@ public class AuthenticationService implements UserDetailsService {
                 return new ResponseEntity<>(new DefaultResponseDTO(3, "User does not exist, please register"), HttpStatus.NOT_FOUND);
             }
 
+            if (user.getIsActive() != null && user.getIsActive() == 0) {
+                ReturnObject returnObject = new ReturnObject();
+                returnObject.setMessage("Your account is inactive. You cannot login.");
+                returnObject.setData(null);
+                return new ResponseEntity<>(returnObject, HttpStatus.FORBIDDEN);
+            }
+
             // Attempt authentication (password verification)
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
                     phone, password));

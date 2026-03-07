@@ -14,6 +14,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class JobCardsDTO {
+    private Integer jobCardId;
     private String code;
     private Byte isTestDrive = 0;
     private Double price;
@@ -21,6 +22,7 @@ public class JobCardsDTO {
     private String privateNotes;
     private String customerNotes;
     private String customerMobileVersion;
+    private String customerMobileMacAddress;
     private String date;
     private Integer carId;
     private String carData;

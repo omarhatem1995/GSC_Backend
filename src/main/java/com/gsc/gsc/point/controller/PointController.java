@@ -17,7 +17,7 @@ public class PointController {
 
     @PostMapping("admin/{userId}")
     public ResponseEntity addPointsByAdmin(@RequestHeader("Authorization") String token,
-                                           @RequestHeader("Accept-Language") String lang,
+                                           @RequestHeader(value = "Accept-Language", required = false) String lang,
                                            @PathVariable("userId") Integer userId,
                                            @RequestBody AddPointsDTO addPointsDTO){
         return pointService.addPointsToUserFromAdmin(token,getLangId(lang),userId,addPointsDTO);

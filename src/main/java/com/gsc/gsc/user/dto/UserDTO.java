@@ -24,5 +24,6 @@ public class UserDTO {
     private String password;
     private String newPassword;
     private String verificationOTP;
+    private Integer isActive;
 
 }

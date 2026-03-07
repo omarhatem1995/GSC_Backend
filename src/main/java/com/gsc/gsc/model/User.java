@@ -41,6 +41,8 @@ public class User {
     private String mail;
     @Column(name = "is_verified")
     private Boolean isVerified;
+    @Column(name = "is_active")
+    private Integer isActive;
     @Column(name = "firebase_token")
     private String firebaseToken;
     @Basic

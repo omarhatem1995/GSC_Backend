@@ -53,7 +53,9 @@ public class JobCardProduct {
     public JobCardProduct(ProductBillDTO productBillDTO, Integer id,Integer userId) {
         this.jobCardId = id;
         this.quantity = productBillDTO.getQuantity();
-        this.productId = productBillDTO.getProductId();
+        if(productBillDTO.getId() != null) {
+            this.productId = productBillDTO.getId();
+        }
         this.price = String.valueOf(productBillDTO.getPrice());
         this.createdBy = userId;
     }

@@ -21,6 +21,7 @@ public class GetAllUsers {
     String address;
     String phone;
     Long points;
+    Integer isActive;
 
     public GetAllUsers(User user,Long totalPoints){
         this.id = user.getId();

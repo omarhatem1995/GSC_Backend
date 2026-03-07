@@ -95,21 +95,20 @@ public class JobCardService {
                     JobCard jobCard = jobCardOptional.get();
                     JobCardNotes jobCardNotes = new JobCardNotes();
                     jobCardNotes.setJobCardId(jobCardId);
-                    if (addJobCardNotes.isForCustomer()) {
-                        jobCard.setCustomerNotes(addJobCardNotes.getNotes());
-                        jobCardNotes.setMessage(addJobCardNotes.getNotes());
-                        jobCardNotes.setIsPrivate(false);
-                        jobCardNotes.setCreatedBy(userId);
-                    } else {
-                        jobCardNotes.setCreatedBy(userId);
-                        jobCardNotes.setMessage(addJobCardNotes.getNotes());
-                        jobCardNotes.setIsPrivate(true);
-                     /*   jobCardNotes.setMessage(addJobCardNotes.getNotes());
-                        jobCardNotes.setCreatedBy(userId);*/
+                    if (addJobCardNotes.getNotes() != null && !addJobCardNotes.getNotes().trim().isEmpty()) {
+                        if (addJobCardNotes.isForCustomer()) {
+                            jobCard.setCustomerNotes(addJobCardNotes.getNotes());
+                            jobCardNotes.setMessage(addJobCardNotes.getNotes());
+                            jobCardNotes.setIsPrivate(false);
+                            jobCardNotes.setCreatedBy(userId);
+                        } else {
+                            jobCardNotes.setCreatedBy(userId);
+                            jobCardNotes.setMessage(addJobCardNotes.getNotes());
+                            jobCardNotes.setIsPrivate(true);
+                        }
+                        jobCardNotes = jobCardNotesRepository.save(jobCardNotes);
                     }
-                    jobCardNotes = jobCardNotesRepository.save(jobCardNotes);
                     jobCard = jobCardRepository.save(jobCard);
-//                    jobCardNotes = jobCardNotesRepository.save(jobCardNotes);
 
                     returnObject.setStatus(true);
                     returnObject.setData(jobCard);
@@ -182,63 +181,96 @@ public class JobCardService {
         }
     }
 
-    public ResponseEntity<?> getJobCardsForUser(String token, Integer lang) {
+    public ResponseEntity<?> getJobCardsForUser(String token, Integer lang, int page, int size, String searchQuery) {
         Integer userId = userService.getUserIdFromToken(token);
-        ReturnObject returnObject = new ReturnObject();
-        if (userId != null) {
-            List<JobCard> jobCardList = jobCardRepository.findAllByUserId(userId);
-            List<GetJobCardsDTO> jobCardsDTOList = new ArrayList<>();
-            for (int i = 0; i < jobCardList.size(); i++) {
-                String carData = "";
-                List<JobCardImages> jobCardImages = jobCardImagesRepository.findAllByJobCardId(jobCardList.get(i).getId());
-                if (jobCardList.get(i).getCarId() != null) {
-                    Optional<Car> carOptional = carRepository.findById(jobCardList.get(i).getCarId());
-                    Car car;
-                    if (carOptional.isPresent()) {
-                        car = carOptional.get();
-                        Optional<Model> modelOptional = modelRepository.findById(car.getModelId());
-                        if (modelOptional.isPresent()) {
-                            Optional<BrandDTO> brandDTOOptional = brandRepository.findBrandsByLangIdAndBrandId(1, modelOptional.get().getBrandId());
-                            carData = "[" + modelOptional.get().getCode() + "]";
-                            if (brandDTOOptional.isPresent()) {
-                                carData = carData + " " + brandDTOOptional.get().getBrandName();
-                            }
-                        }
-                    }
-                }
-                List<JobCardNotes> jobCardNotesList = jobCardNotesRepository.findAllByJobCardId(jobCardList.get(i).getId());
-                List<JobCardNotesDTO> jobCardNotesDTOList = new ArrayList<>();
-                for (JobCardNotes jobCardNotes : jobCardNotesList) {
-                    if (jobCardNotes.getCreatedBy() != null) {
-                        Optional<User> jobCardCreatedByUser = userRepository.findById(jobCardNotes.getCreatedBy());
-                        boolean isPrivate = jobCardNotes.getIsPrivate();
-                        if (jobCardCreatedByUser.isPresent()) {
-                            String userType;
-                            if (jobCardCreatedByUser.get().getAccountTypeId().equals(BUSINESS_TYPE) || jobCardCreatedByUser.get().getAccountTypeId().equals(USER_TYPE) && !isPrivate) {
-                                userType = "User";
-                                JobCardNotesDTO jobCardNotesDTO = new JobCardNotesDTO(jobCardNotes, jobCardCreatedByUser.get().getName(), userType);
-                                jobCardNotesDTOList.add(jobCardNotesDTO);
-                            } else if (jobCardCreatedByUser.get().getAccountTypeId().equals(ADMIN_TYPE)) {
-                                userType = "Admin";
-                                JobCardNotesDTO jobCardNotesDTO = new JobCardNotesDTO(jobCardNotes, jobCardCreatedByUser.get().getName(), userType);
-                                jobCardNotesDTOList.add(jobCardNotesDTO);
-                            }
-                        }
-                    }
-                }
-                jobCardsDTOList.add(new GetJobCardsDTO(jobCardList.get(i), jobCardImages, carData, jobCardNotesDTOList));
-            }
+        ReturnObjectPaging returnObject = new ReturnObjectPaging();
 
-            returnObject.setMessage("Loaded Successfully");
-            returnObject.setData(jobCardsDTOList);
-            return ResponseEntity.ok(returnObject);
-        } else {
+        if (userId == null) {
             returnObject.setMessage("User Id is Invalid");
-            returnObject.setData(jobCardRepository.findAll());
+            returnObject.setData(Collections.emptyList());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(returnObject);
         }
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        // ✅ Search by code if searchQuery is provided
+        Page<JobCard> jobCardPage;
+        if (searchQuery != null && !searchQuery.trim().isEmpty()) {
+            jobCardPage = jobCardRepository.findByUserIdAndCodeContainingIgnoreCase(userId, searchQuery.trim(), pageable);
+        } else {
+            jobCardPage = jobCardRepository.findAllByUserId(userId, pageable);
+        }
+
+        List<GetJobCardsDTO> jobCardsDTOList = jobCardPage.getContent()
+                .stream()
+                .map(jobCard -> {
+                    // --- Car Data ---
+                    String carData = "";
+                    if (jobCard.getCarId() != null) {
+                        carData = getCarData(jobCard.getCarId(), lang); // helper method to map car
+                    }
+
+                    // --- JobCard Images ---
+//                    List<JobCardImages> jobCardImages = jobCardImagesRepository.findAllByJobCardId(jobCard.getId());
+
+                    // --- JobCard Notes ---
+                  /*  List<JobCardNotes> jobCardNotesList = jobCardNotesRepository.findAllByJobCardId(jobCard.getId());
+                    List<JobCardNotesDTO> jobCardNotesDTOList = jobCardNotesList.stream()
+                            .map(note -> mapNoteToDTO(note))
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList());
+*/
+                    return new GetJobCardsDTO(jobCard, null, carData, null);
+                })
+                .collect(Collectors.toList());
+
+        returnObject.setMessage("Loaded Successfully");
+        returnObject.setData(jobCardsDTOList);
+        returnObject.setTotalCount(jobCardPage.getTotalElements());
+        returnObject.setTotalPages(jobCardPage.getTotalPages());
+
+        return ResponseEntity.ok(returnObject);
     }
 
+    private String getCarData(Integer carId, Integer lang) {
+        Optional<Car> carOpt = carRepository.findById(carId);
+        if (carOpt.isEmpty()) return "";
+
+        Car car = carOpt.get();
+        Optional<Model> modelOpt = modelRepository.findById(car.getModelId());
+        if (modelOpt.isEmpty()) return "";
+
+        Model model = modelOpt.get();
+        String carData = "[" + model.getCode() + "]";
+
+        Optional<BrandDTO> brandOpt = brandRepository.findBrandsByLangIdAndBrandId(lang, model.getBrandId());
+        if (brandOpt.isPresent()) {
+            carData += " " + brandOpt.get().getBrandName();
+        }
+
+        return carData;
+    }
+
+    private JobCardNotesDTO mapNoteToDTO(JobCardNotes note) {
+        if (note.getCreatedBy() == null) return null;
+
+        Optional<User> userOpt = userRepository.findById(note.getCreatedBy());
+        if (userOpt.isEmpty()) return null;
+
+        User user = userOpt.get();
+        boolean isPrivate = note.getIsPrivate();
+
+        String userType = null;
+        if ((user.getAccountTypeId().equals(BUSINESS_TYPE) || user.getAccountTypeId().equals(USER_TYPE)) && !isPrivate) {
+            userType = "User";
+        } else if (user.getAccountTypeId().equals(ADMIN_TYPE)) {
+            userType = "Admin";
+        }
+
+        if (userType == null) return null;
+
+        return new JobCardNotesDTO(note, user.getName(), userType);
+    }
     public ResponseEntity<?> getJobCards(String token, Integer lang, Pageable pageable) {
         Integer userId = userService.getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
@@ -345,8 +377,14 @@ public class JobCardService {
                     }
                 }
             }
-
             getJobCardsDTO.setJobCardNotes(jobCardNotesDTOList);
+
+            if (getJobCardsDTO.getCarId() != null) {
+                Optional<Car> carOpt = carRepository.findById(getJobCardsDTO.getCarId());
+                carOpt.ifPresent(car -> {
+                    getJobCardsDTO.setCarData(getCarData(car.getId(),1));
+                });
+            }
         }
 
         returnObject.setMessage("Loaded Successfully");
@@ -479,10 +517,7 @@ public class JobCardService {
                     if (productOptional.isPresent()) {
                         Product product = productOptional.get();
 
-                        List<ProductImages> productImages = productImagesRepository.findAllByProductId(product.getId());
-                        String productImageUrl = "";
-                        if (!productImages.isEmpty())
-                            productImageUrl = productImages.get(0).getUrl();
+                        String productImageUrl = product.getImageUrl();
                         productBillDTOList.add(new ProductBillDTO(product.getId(), product.getCode(), product.getPrice(), 0, 0, jobCardProductList.get(i).getQuantity(), product.getId(), productImageUrl, product.getCode(), jobCardProductList.get(i).getCreatedBy()));
 
                     }
@@ -556,7 +591,7 @@ public class JobCardService {
         }
     }
 
-    public ResponseEntity<?> create(String token, JobCardsDTO jobCardsDTO) {
+    public ResponseEntity<?> create(String token, JobCardsDTO jobCardsDTO, List<MultipartFile> images) {
         Integer userId = userService.getUserIdFromToken(token);
         if (jobCardsDTO.getCarId() != null) {
             Optional<Car> carByLicenseNumber = carRepository.findById(jobCardsDTO.getCarId());
@@ -566,9 +601,10 @@ public class JobCardService {
                 jobCardsDTO.setDate(LocalDate.now().toString());
                 jobCardsDTO.setCode(UniqueCodeGenerator.generateNewJobCardCode(jobCardRepository.findFirstByOrderByIdDesc().getCode()));
                 JobCard jobCard = new JobCard(jobCardsDTO, 4, USER_TYPE);
+                jobCard.setDownPayment(0.0); //customer can't add down payment
                 jobCard = jobCardRepository.save(jobCard);
 
-                if (jobCardsDTO.getCustomerNotes() != null) {
+                if (jobCardsDTO.getCustomerNotes() != null && !jobCard.getCustomerNotes().isEmpty()) {
                     JobCardNotes jobCardNotes = new JobCardNotes();
                     jobCardNotes.setMessage(jobCard.getCustomerNotes());
                     jobCardNotes.setJobCardId(jobCard.getId());
@@ -577,13 +613,23 @@ public class JobCardService {
                     jobCardNotesRepository.save(jobCardNotes);
                 }
 
-                if (!jobCardsDTO.getJobCardsUrl().isEmpty()) {
-                    List<JobCardImages> jobCardImagesList = new ArrayList<>();
-                    for (int i = 0; i < jobCardsDTO.getJobCardsUrl().size(); i++) {
-                        JobCardImages jobCardImage = new JobCardImages(jobCardsDTO.getJobCardsUrl().get(i), jobCard.getId());
-                        jobCardImagesList.add(jobCardImage);
+                if (images != null && !images.isEmpty()) {
+                    List<String> uploadedUrls = new ArrayList<>();
+                    for (MultipartFile image : images) {
+                        try {
+                            // Upload to your service, e.g., ImgBB or other
+                            String imageUrl = imgBBService.uploadImage(image);
+                            uploadedUrls.add(imageUrl);
+
+                            // Save image info in JobCardImages table
+                            JobCardImages jobCardImage = new JobCardImages(imageUrl, jobCard.getId());
+                            jobCardImagesRepository.save(jobCardImage);
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
-                    jobCardImagesRepository.saveAll(jobCardImagesList);
+                    jobCardsDTO.setJobCardsUrl(uploadedUrls);
                 }
                 if (jobCardsDTO.getOtherProductsDTOList() != null) {
                     for (int i = 0; i < jobCardsDTO.getOtherProductsDTOList().size(); i++) {
@@ -639,6 +685,7 @@ public class JobCardService {
             return ResponseEntity.ok(returnObject);
         }
     }
+
     public ReturnObject createByAdmin(String token, JobCardsDTO jobCardsDTO, List<MultipartFile> images) {
         Integer userId = userService.getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
@@ -650,14 +697,14 @@ public class JobCardService {
             returnObject.setData(null);
             return returnObject;
         }
-        if(userAdmin != null) {
+        if (userAdmin != null) {
             if (userAdmin.getAccountTypeId() != ADMIN_TYPE) {
                 returnObject.setMessage("User Not Admin");
                 returnObject.setStatus(false);
                 returnObject.setData(null);
                 return returnObject;
             }
-        }else{
+        } else {
             returnObject.setMessage("Can't find the admin user");
             returnObject.setStatus(false);
             returnObject.setData(null);
@@ -825,7 +872,7 @@ public class JobCardService {
         return returnObject;
     }*/
 
-    public ReturnObject updateByAdmin(String token, JobCardsDTO jobCardsDTO, Integer jobCardId) {
+    public ReturnObject updateByAdmin(String token, JobCardsDTO jobCardsDTO, Integer jobCardId, List<MultipartFile> images) {
         Integer userId = userService.getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
         ReturnObject returnObject = new ReturnObject();
@@ -849,21 +896,38 @@ public class JobCardService {
                         //Create Invoice
                         if (!billService.checkExistingInvoice(existingJobCard)) {
                             billService.createJobCardBill(jobCardsDTO.getUserId(), existingJobCard);
-                        }else{
+                        } else {
                             returnObject.setMessage("Invoice Already Created");
                             returnObject.setStatus(false);
                         }
                     }
                     // Save updated job card
                     jobCardRepository.save(existingJobCard);
+                    if (images != null && !images.isEmpty()) {
+                        List<String> uploadedUrls = new ArrayList<>();
+                        for (MultipartFile image : images) {
+                            try {
+                                // Upload to your service, e.g., ImgBB or other
+                                String imageUrl = imgBBService.uploadImage(image);
+                                uploadedUrls.add(imageUrl);
 
+                                // Save image info in JobCardImages table
+                                JobCardImages jobCardImage = new JobCardImages(imageUrl, jobCardId);
+                                jobCardImagesRepository.save(jobCardImage);
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        jobCardsDTO.setJobCardsUrl(uploadedUrls);
+                    }
                     // Save new images associated with the job card
-                    if (jobCardsDTO.getJobCardsUrl() != null) {
+          /*          if (jobCardsDTO.getJobCardsUrl() != null) {
                         for (String imageUrl : jobCardsDTO.getJobCardsUrl()) {
                             JobCardImages jobCardImages = new JobCardImages(imageUrl, existingJobCard.getId());
                             jobCardImagesRepository.save(jobCardImages);
                         }
-                    }
+                    }*/
 
                     // Clear existing products associated with the job card
                     jobCardProductRepository.deleteAllByJobCardId(existingJobCard.getId());
@@ -953,7 +1017,7 @@ public class JobCardService {
                     //Create Invoice
                     if (!billService.checkExistingInvoice(existingJobCard)) {
                         billService.createJobCardBill(existingJobCard.getUserId(), existingJobCard);
-                    }else{
+                    } else {
                         returnObject.setMessage("Invoice Already Created");
                         returnObject.setStatus(false);
                     }
@@ -999,7 +1063,7 @@ public class JobCardService {
         System.out.println(adminNotesNotYetApprovedByCustomer.size());
     }
 
-    public ResponseEntity updateStatusByUser(String token, Integer jobCardId, JobCardsDTO jobCardsDTO) {
+    public ResponseEntity updateStatusByUser(String token, Integer jobCardId, JobCardsDTO jobCardsDTO, List<MultipartFile> images) {
         ReturnObject returnObject = new ReturnObject();
         if (token != null) {
             Integer userId = userService.getUserIdFromToken(token);
@@ -1011,11 +1075,23 @@ public class JobCardService {
                         jobCard.setJobCardStatusId(APPROVED);
                         jobCardRepository.save(jobCard);
                     }
-                    if (jobCardsDTO.getJobCardsUrl() != null) {
-                        for (String imageUrl : jobCardsDTO.getJobCardsUrl()) {
-                            JobCardImages jobCardImages = new JobCardImages(imageUrl, jobCard.getId());
-                            jobCardImagesRepository.save(jobCardImages);
+                    if (images != null && !images.isEmpty()) {
+                        List<String> uploadedUrls = new ArrayList<>();
+                        for (MultipartFile image : images) {
+                            try {
+                                // Upload to your service, e.g., ImgBB or other
+                                String imageUrl = imgBBService.uploadImage(image);
+                                uploadedUrls.add(imageUrl);
+
+                                // Save image info in JobCardImages table
+                                JobCardImages jobCardImage = new JobCardImages(imageUrl, jobCard.getId());
+                                jobCardImagesRepository.save(jobCardImage);
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
                         }
+                        jobCardsDTO.setJobCardsUrl(uploadedUrls);
                     }
                     List<JobCardNotes> adminNotesNotYetApprovedByCustomer = jobCardNotesRepository.findAllByJobCardIdAndIsPrivateAndApprovedByCustomerAtIsNullAndCreatedByNot(jobCard.getId(), false, userId);
                     System.out.println("getAdminNotes Count : " + adminNotesNotYetApprovedByCustomer.size());
@@ -1023,6 +1099,7 @@ public class JobCardService {
                         for (JobCardNotes jobCardNotes : adminNotesNotYetApprovedByCustomer) {
                             jobCardNotes.setApprovedByCustomerAt(Timestamp.from(Instant.now()));
                             jobCardNotes.setCustomerMobileVersion(jobCardsDTO.getCustomerMobileVersion());
+                            jobCardNotes.setCustomerMobileMacAddress(jobCardsDTO.getCustomerMobileMacAddress());
                             jobCardNotesRepository.save(jobCardNotes);
                         }
                     }
@@ -1046,6 +1123,7 @@ public class JobCardService {
                         jobCardNotes.setCreatedBy(userId);
                         jobCardNotes.setApprovedByCustomerAt(Timestamp.from(Instant.now()));
                         jobCardNotes.setCustomerMobileVersion(jobCardsDTO.getCustomerMobileVersion());
+                        jobCardNotes.setCustomerMobileMacAddress(jobCardsDTO.getCustomerMobileMacAddress());
                         jobCardNotesRepository.save(jobCardNotes);
                     }
                     if (jobCardsDTO.getPrivateNotes() != null) {
