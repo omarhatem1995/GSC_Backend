@@ -10,7 +10,7 @@ import com.gsc.gsc.inventory.model.ProductModelSellerBrand;
 import com.gsc.gsc.model.*;
 import com.gsc.gsc.product.dto.GetProductsDTO;
 import com.gsc.gsc.repo.*;
-import com.gsc.gsc.seller_brand.SellerBrandsDTO;
+import com.gsc.gsc.configurations.dto.seller_brand.SellerBrandsDTO;
 import com.gsc.gsc.utilities.ImgBBService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

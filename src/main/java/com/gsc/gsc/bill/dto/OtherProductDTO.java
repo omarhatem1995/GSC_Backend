@@ -12,6 +12,7 @@ public class OtherProductDTO {
     Integer id;
     String productName;
     Integer quantity;
+    Double discount;
     String price;
     Integer createdBy;
 
@@ -27,5 +28,6 @@ public class OtherProductDTO {
         this.price = String.valueOf(billProduct.getPrice());
         this.quantity = billProduct.getQuantity();
         this.productName  = billProduct.getName();
+        this.discount  = billProduct.getDiscount();
     }
 }

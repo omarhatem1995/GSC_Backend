@@ -63,8 +63,6 @@ public class JobCardPdfGeneratorITextService {
     @Autowired
     private BrandRepository brandRepository;
     @Autowired
-    private BrandTextRepository brandTextRepository;
-    @Autowired
     private JobCardNotesRepository jobCardNotesRepository;
     @Autowired
     private JobCardImagesRepository jobCardImagesRepository;
@@ -193,16 +191,11 @@ public class JobCardPdfGeneratorITextService {
                             Optional<Brand> brandOptional = brandRepository.findById(model.getBrandId());
                             if (brandOptional.isPresent()) {
                                 Brand brand = new Brand();
-                                if(brand.getCode() !=null ){
+                                if (brand.getCode() != null) {
                                     carModel.append("/").append(brand.getCode());
                                 }
-                                Optional<BrandText> brandTextOptional = brandTextRepository.findByBrandIdAndLangId(brand.getId(), 1);
-                                System.out.println("brand Text : " + brandTextOptional.isPresent());
-                                if (brandTextOptional.isPresent()) {
-                                    BrandText brandText = brandTextOptional.get();
-                                    if (brandText.getName() != null) {
-                                        carModel.append("/").append(brandText.getName());
-                                    }
+                                if (brand.getNameEn() != null) {
+                                    carModel.append("/").append(brand.getNameEn());
                                 }
                             }
                         }

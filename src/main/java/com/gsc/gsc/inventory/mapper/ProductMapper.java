@@ -2,7 +2,7 @@ package com.gsc.gsc.inventory.mapper;
 
 import com.gsc.gsc.inventory.dto.ProductWithSellerBrandDTO;
 import com.gsc.gsc.product.dto.GetProductsDTO;
-import com.gsc.gsc.seller_brand.SellerBrandsDTO;
+import com.gsc.gsc.configurations.dto.seller_brand.SellerBrandsDTO;
 
 import java.util.ArrayList;
 import java.util.List;

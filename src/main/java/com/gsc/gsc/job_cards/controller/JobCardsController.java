@@ -42,12 +42,13 @@ public class JobCardsController {
     @GetMapping("")
     public ResponseEntity<?> findAllJobCards(
             @RequestHeader("Authorization") String token,
-            @RequestHeader(value = "Accept-Language",required = false) String langId,
+            @RequestHeader(value = "Accept-Language", required = false) String langId,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
-            @RequestParam(name = "searchQuery", required = false) String searchQuery
+            @RequestParam(name = "searchQuery", required = false) String searchQuery,
+            @RequestParam(name = "carId", required = false) Integer carId // ✅ new filter
     ) {
-        return jobCardService.getJobCardsForUser(token, getLangId(langId), page, size, searchQuery);
+        return jobCardService.getJobCardsForUser(token, getLangId(langId), page, size, searchQuery, carId);
     }
     @PutMapping("notes/{jobCardId}")
     public ResponseEntity addNotesAdmin(@RequestHeader("Authorization") String token,

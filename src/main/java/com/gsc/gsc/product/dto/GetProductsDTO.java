@@ -1,12 +1,11 @@
 package com.gsc.gsc.product.dto;
 
-import com.gsc.gsc.seller_brand.SellerBrandsDTO;
+import com.gsc.gsc.configurations.dto.seller_brand.SellerBrandsDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Data

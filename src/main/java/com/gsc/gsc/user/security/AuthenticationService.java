@@ -7,6 +7,7 @@ import com.gsc.gsc.model.User;
 import com.gsc.gsc.repo.PointRepository;
 import com.gsc.gsc.repo.UserRepository;
 import com.gsc.gsc.user.dto.DefaultResponseDTO;
+import com.gsc.gsc.user.dto.LoginDTO;
 import com.gsc.gsc.user.dto.LoginResponseDTO;
 import com.gsc.gsc.user.dto.PointsDTO;
 import com.gsc.gsc.user.security.util.JwtUtil;
@@ -27,6 +28,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 import static com.gsc.gsc.constants.UserTypes.NOT_VERIFIED_USER;
 
 @Service
@@ -128,7 +130,6 @@ public class AuthenticationService implements UserDetailsService {
             return new ResponseEntity<>(returnObject, HttpStatus.FORBIDDEN);
         }
     }
-
     private String generateOtp() {
         // Generate a 6-digit OTP
         return String.valueOf((int)(Math.random() * 900000) + 100000);

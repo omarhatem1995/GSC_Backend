@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 public class CompatibleVehiclesDTO {
     Integer brandId;
     String brandName;
-    String imageUrl;
+    String brandImageUrl;
     String vehicleCode;
     Integer creationYear;
 }

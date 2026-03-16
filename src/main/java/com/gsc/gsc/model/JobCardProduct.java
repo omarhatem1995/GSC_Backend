@@ -31,6 +31,8 @@ public class JobCardProduct {
     private String name;
     @Column(name = "price")
     private String price;
+    @Column(name = "discount")
+    private Double discount;
     @Column(name = "customer_mobile_version")
     private String customerMobileVersion;
     @Column(name = "created_by")

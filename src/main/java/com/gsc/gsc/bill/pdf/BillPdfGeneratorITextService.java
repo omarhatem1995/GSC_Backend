@@ -67,8 +67,6 @@ public class BillPdfGeneratorITextService {
     @Autowired
     private BrandRepository brandRepository;
     @Autowired
-    private BrandTextRepository brandTextRepository;
-    @Autowired
     private JobCardNotesRepository jobCardNotesRepository;
     @Autowired
     private JobCardImagesRepository jobCardImagesRepository;
@@ -120,334 +118,6 @@ public class BillPdfGeneratorITextService {
         }
     }
 
-    public ReturnObject exportIText(String token, int billId, String macAddress,Boolean includePrivateNotes) throws IOException {
-        Integer userId = userService.getUserIdFromToken(token);
-        User user = userRepository.findUserById(userId);
-        Integer accountType = user.getAccountTypeId();
-
-        if(includePrivateNotes == null){
-            includePrivateNotes = false;
-        }
-
-        String filePath = "/var/www/bills/BillPdf/Inv_" + billId + ".pdf";
-        File file = new File(filePath);
-        createFile(filePath);
-//        createDummy();
-        // Ensure the parent directory exists
-        if (file.getParentFile() != null && !file.getParentFile().exists()) {
-            if (file.getParentFile().mkdirs()) {
-                System.out.println("Directories created successfully.");
-            } else {
-                System.out.println("Failed to create directories. Check directory permissions.");
-                throw new IOException("Failed to create required directories.");
-            }
-        }
-
-        if (file.exists()) {
-            System.out.println("File already exists. Checking write permissions...");
-            if (!file.canWrite()) {
-                throw new IOException("File exists but is not writable.");
-            }
-        } else {
-            if (!file.createNewFile()) {
-                throw new IOException("Failed to create the PDF file.");
-            }
-        }
-
-        PdfWriter pdfWriter = new PdfWriter(new FileOutputStream(file));
-        PdfDocument pdfDocument = new PdfDocument(pdfWriter);
-        pdfDocument.setDefaultPageSize(PageSize.A4);
-        Document document = new Document(pdfDocument);
-
-        ReturnObject returnObject = new ReturnObject();
-
-        Optional<Bill> billOptional = billRepository.findById(billId);
-        if (billOptional.isPresent()) {
-            Bill bill = billOptional.get();
-
-            String userName = "...........";
-            String address = "...........";
-            String phone = "...........";
-            String carMake = "...........";
-            String downPayment = "0";
-            String referenceNumber = bill.getReferenceNumber();
-            if (referenceNumber != null) {
-                // Remove "Inv" from anywhere in the string
-                referenceNumber = referenceNumber.replace("Inv", "");
-                // Set it back to the bill object if needed
-                bill.setReferenceNumber(referenceNumber);
-            }
-            Optional<JobCard> jobCardOptional = jobCardRepository.findByCode(referenceNumber);
-            if(jobCardOptional.isPresent()) {
-                JobCard jobCard = jobCardOptional.get();
-                if (jobCard.getDownPayment() != null) {
-                    downPayment = jobCard.getDownPayment().toString();
-                }
-            }
-            StringBuilder carModel = new StringBuilder("...........");
-            String carKilosCovered = "...........";
-            if (user.getName() != null)
-                userName = user.getName();
-            if (user.getAddress() != null)
-                address = user.getAddress();
-            if (user.getPhone() != null)
-                phone = user.getPhone();
-            Optional<Car> carOptional = carRepository.findById(bill.getCarId());
-            if (carOptional.isPresent()) {
-                Car car = carOptional.get();
-                carMake = car.getLicenseNumber();
-                if (car.getModelId() != null) {
-                    Optional<Model> modelOptional = modelRepository.findById(car.getModelId());
-                    if (modelOptional.isPresent()) {
-                        Model model = modelOptional.get();
-                        carModel.append(model.getCode()).append("/").append(model.getCreationYear());
-                        if (model.getBrandId() != null) {
-                            Optional<Brand> brandOptional = brandRepository.findById(model.getBrandId());
-                            if (brandOptional.isPresent()) {
-                                Brand brand = new Brand();
-                                carModel.append("/").append(brand.getCode());
-                                Optional<BrandText> brandTextOptional = brandTextRepository.findByBrandIdAndLangId(brand.getId(), 1);
-                                System.out.println(brandTextOptional.isPresent());
-                                if (brandTextOptional.isPresent()) {
-                                    BrandText brandText = brandTextOptional.get();
-                                    if (brandText.getName() != null) {
-                                        carModel.append("/").append(brandText.getName());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                carKilosCovered = car.getCoveredKilos();
-            }
-
-            List<JobCardNotes> jobCardNotes = jobCardNotesRepository.findAllByJobCardId(billId);
-
-            // Create a centered title
-            Paragraph title = new Paragraph("GSC")
-                    .setFontSize(16f)
-                    .setBold()
-                    .setTextAlignment(TextAlignment.CENTER);
-
-            document.add(title);
-
-            float[] columnWidths = {1, 1}; // Two equally sized columns
-            Table table = new Table(columnWidths);
-            table.setWidthPercent(100);
-
-            // Add "JOB CARD" to the first cell
-            table.addCell(new com.itextpdf.layout.element.Cell()
-                    .add(new Paragraph("BILL").setFontSize(12f).setBold())
-                    .setBorder(Border.NO_BORDER));
-
-            // Add "JOB NO: xxx" to the second cell, aligned to the right
-            table.addCell(new com.itextpdf.layout.element.Cell()
-                    .add(new Paragraph("BILL NO: " + "Inv"+bill.getReferenceNumber()).setFontSize(12f))
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setBorder(Border.NO_BORDER));
-
-            document.add(table);
-
-            document.add(new Paragraph("Name: " + userName).setFontSize(12f).setMarginTop(10f));
-            document.add(new Paragraph("Address: " + address).setFontSize(12f));
-            document.add(new Paragraph("Phone: " + phone).setFontSize(12f));
-            document.add(new Paragraph("Car: " + carMake).setFontSize(12f));
-            document.add(new Paragraph("Device Mac Address: " + macAddress).setFontSize(12f));
-            document.add(new Paragraph("Car Model: " + carModel).setFontSize(12f));
-            document.add(new Paragraph("Down Payment : " + downPayment).setFontSize(12f));
-            if(jobCardOptional.isPresent()) {
-                if (jobCardOptional.get().getIsTestDrive() == 1) {
-                    document.add(new Paragraph("Test Drive: Yes").setFontSize(12f));
-                }
-            }
-            if (bill.getStatusId() == PAID) {
-                document.add(new Paragraph("Status: Paid").setFontSize(12f));
-            } else if (bill.getStatusId() == NOT_PAID) {
-                document.add(new Paragraph("Status: Not Paid").setFontSize(12f));
-            }
-            document.add(new Paragraph("Kilos: " + carKilosCovered).setFontSize(12f));
-
-            PdfFont arabicFont = createArabicFontForPdf();
-            /*if (!jobCardNotes.isEmpty()) {
-                Table notesTable = new Table(new float[]{200f, 150f, 150f, 150f, 150f});  // 5 columns
-                notesTable.setWidthPercent(100);
-                notesTable.addCell(new Cell().add("Message").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                notesTable.addCell(new Cell().add("Created By").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                notesTable.addCell(new Cell().add("Customer Model Number").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                notesTable.addCell(new Cell().add("Approved By Customer At").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                notesTable.addCell(new Cell().add("Created At").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-
-                for (JobCardNotes note : jobCardNotes) {
-                    Integer createdById = note.getCreatedBy();
-                    User userCreatedNote = userRepository.findUserById(createdById);
-                    Integer createdNoteAccountType = userCreatedNote.getAccountTypeId();
-                    System.out.println("Note : " + note.getId());
-                    if (!note.getIsPrivate()) {
-                        System.out.println("Note Not Private : " + note.getIsPrivate());
-                        addNotes(user, userName, notesTable, arabicFont, note,createdNoteAccountType);
-                    } else {
-                        if (accountType.equals(ADMIN_TYPE) && includePrivateNotes) {
-                            System.out.println("Note is Private : " + note.getIsPrivate());
-                            addNotes(user, userName, notesTable, arabicFont, note,createdNoteAccountType);
-                        }
-                    }
-                }
-                document.add(notesTable);
-            }*/
-
-            Optional<List<BillProduct>> optionalBillProductList = billProductRepository.findAllByBillId(billId);
-            document.add(new Paragraph(" ").setFontSize(12f));
-            if (optionalBillProductList.isPresent()) {
-                List<BillProduct> billProductList = optionalBillProductList.get();
-                if (!billProductList.isEmpty()) {
-                    Table productsTable = new Table(new float[]{200f, 150f, 150f, 150f, 150f});  // 3 columns
-                    productsTable.addCell(new Cell().add("Product").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                    productsTable.addCell(new Cell().add("QTY").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                    productsTable.addCell(new Cell().add("PRICE").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                    productsTable.addCell(new Cell().add("Added By").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-                    productsTable.addCell(new Cell().add("Approved By Customer At").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-
-                    for (BillProduct billProduct : billProductList) {
-                        if (billProduct.getProductId() != null) {
-                            String productName = "Product";
-                            String productPrice = "0";
-                            String productQuantity = "0";
-                            if (billProduct.getName() == null) {
-                                Optional<Product> productOptional = productRepository.findById(billProduct.getProductId());
-                                if(productOptional.isPresent()) {
-                                    productName = productOptional.get().getCode();
-                                }
-                            }
-                            if (billProduct.getPrice() != null)
-                                productPrice = String.valueOf(billProduct.getPrice());
-                            if (billProduct.getQuantity() != null)
-                                productQuantity = String.valueOf(billProduct.getQuantity());
-
-                            String createdBy = "Admin";
-                            String approvedByCustomerAt = "Not Yet";
-                            if (user != null) {
-                                if (billProduct.getCreatedBy() != null) {
-                                    if (billProduct.getCreatedBy().equals(user.getId())) {
-                                        createdBy = userName;
-                                        approvedByCustomerAt = "Customer Added it";
-                                    } else {
-                                        if (billProduct.getCustomerApprovedAt() != null) {
-                                            approvedByCustomerAt = billProduct.getCustomerApprovedAt().toString();
-                                        } else {
-                                            approvedByCustomerAt = "Not Yet";
-                                        }
-                                    }
-                                }
-                            }
-                            // Assuming JobCardNote has fields: getMessage(), getCreatedBy(), getCreatedAt()
-                            billProduct.setName(productName);
-                            addProductWithLanguage(productsTable, arabicFont, billProduct,createdBy,approvedByCustomerAt,productQuantity,productPrice);
-                        }else{
-                            String productName = "Product";
-                            String productPrice = "0";
-                            String productQuantity = "0";
-                            if (billProduct.getName() != null)
-                                productName = billProduct.getName();
-                            if (billProduct.getPrice() != null)
-                                productPrice = String.valueOf(billProduct.getPrice());
-                            if (billProduct.getQuantity() != null)
-                                productQuantity = String.valueOf(billProduct.getQuantity());
-
-                            String createdBy = "Admin";
-                            String approvedByCustomerAt = "Not Yet";
-                            if (user != null) {
-                                if (billProduct.getCreatedBy() != null) {
-                                    if (billProduct.getCreatedBy().equals(user.getId())) {
-                                        createdBy = userName;
-                                        approvedByCustomerAt = "Customer Added it";
-                                    } else {
-                                        if (billProduct.getCustomerApprovedAt() != null) {
-                                            approvedByCustomerAt = billProduct.getCustomerApprovedAt().toString();
-                                        } else {
-                                            approvedByCustomerAt = "Not Yet";
-                                        }
-                                    }
-                                }
-                            }
-                        addProductWithLanguage(productsTable, arabicFont, billProduct,createdBy,approvedByCustomerAt,productQuantity,productPrice);
-                        }
-                    }
-                    document.add(productsTable);
-                }
-            }
-            if(jobCardOptional.isPresent()) {
-                List<JobCardImages> jobCardImages = jobCardImagesRepository.findAllByJobCardId(jobCardOptional.get().getId());
-
-                float maxWidth = 200f; // Maximum width
-                float maxHeight = 200f; // Maximum height
-
-                if (!jobCardImages.isEmpty()) {
-                    document.add(new Paragraph("Job Card Images:").setFontSize(12f).setBold());
-                    int counter = 1;
-                    for (JobCardImages jobCardImage : jobCardImages) {
-                        try {
-                            // Fetch the image data from the Firebase Storage URL
-                            URL url = new URL(jobCardImage.getUrl());
-                            System.out.println("Url : " + url);
-                            InputStream inputStream = url.openStream();
-
-                            // Read the image data and determine its type
-                            BufferedImage bufferedImage = ImageIO.read(inputStream);
-                            if (bufferedImage == null) {
-                                throw new IOException("Image format not recognized");
-                            }
-
-                            // Convert the BufferedImage to a byte array with explicit format
-                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                            String format = "png";
-                            if (String.valueOf(url).toLowerCase().contains("png")) {
-                                format = "png";
-                            }
-                            ImageIO.write(bufferedImage, format, baos); // Explicitly set the format
-                            byte[] imageBytes = baos.toByteArray();
-
-                            // Add the image to the PDF document
-                            Image image = new Image(ImageDataFactory.create(imageBytes)).setAutoScale(true);
-
-                            // Get the original dimensions of the image
-                            float originalWidth = image.getImageWidth();
-                            float originalHeight = image.getImageHeight();
-
-                            if (originalWidth > maxWidth || originalHeight > maxHeight) {
-                                float widthRatio = maxWidth / originalWidth;
-                                float heightRatio = maxHeight / originalHeight;
-                                float scalingFactor = Math.min(widthRatio, heightRatio);
-
-                                // Apply scaling directly with float values
-                                image.scaleToFit(originalWidth * scalingFactor, originalHeight * scalingFactor);
-                            }
-
-                            document.add(image);
-                            document.add(new Paragraph("\n")).setWidth(200f).setHeight(200f);
-
-                            counter++;
-                        } catch (IOException e) {
-                            // Log and handle exceptions for missing or invalid images
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            }
-
-
-            document.close();
-
-            returnObject.setData(filePath);
-            returnObject.setStatus(true);
-            returnObject.setMessage("Loaded Successfully");
-        } else {
-            document.close();
-            returnObject.setData(null);
-            returnObject.setStatus(false);
-            returnObject.setMessage("No Job Card found");
-        }
-        return returnObject;
-    }
     public ReturnObject exportIText2(String token, int billId, String macAddress,Boolean includePrivateNotes) throws IOException {
         Integer userId = userService.getUserIdFromToken(token);
         User user = userRepository.findUserById(userId);
@@ -509,9 +179,6 @@ public class BillPdfGeneratorITextService {
             Optional<JobCard> jobCardOptional = jobCardRepository.findByCode(referenceNumber);
             if(jobCardOptional.isPresent()) {
                 JobCard jobCard = jobCardOptional.get();
-                if (jobCard.getDownPayment() != null) {
-                    downPayment = jobCard.getDownPayment().toString();
-                }
             }
             Color headerBgColor = new DeviceRgb(230, 230, 230); // light gray background
             StringBuilder carModel = new StringBuilder("...........");
@@ -537,14 +204,11 @@ public class BillPdfGeneratorITextService {
                                 Optional<Brand> brandOptional = brandRepository.findById(model.getBrandId());
                                 if (brandOptional.isPresent()) {
                                     Brand brand = new Brand();
-                                    carModel.append("/").append(brand.getCode());
-                                    Optional<BrandText> brandTextOptional = brandTextRepository.findByBrandIdAndLangId(brand.getId(), 1);
-                                    System.out.println(brandTextOptional.isPresent());
-                                    if (brandTextOptional.isPresent()) {
-                                        BrandText brandText = brandTextOptional.get();
-                                        if (brandText.getName() != null) {
-                                            carModel.append("/").append(brandText.getName());
-                                        }
+                                    if(brand.getCode() != null) {
+                                        carModel.append("/").append(brand.getCode());
+                                    }
+                                    if (brand.getNameEn() != null) {
+                                        carModel.append("/").append(brand.getNameEn());
                                     }
                                 }
                             }
@@ -555,52 +219,6 @@ public class BillPdfGeneratorITextService {
             }
 
             List<BillNotes> billNotes = billNotesRepository.findAllByBillId(billId);
-
-            // Create a centered title
-/*
-            Paragraph title = new Paragraph("GSC")
-                    .setFontSize(16f)
-                    .setBold()
-                    .setTextAlignment(TextAlignment.CENTER);
-
-            document.add(title);
-
-            float[] columnWidths = {1, 1}; // Two equally sized columns
-            Table table = new Table(columnWidths);
-            table.setWidthPercent(100);
-
-            // Add "JOB CARD" to the first cell
-            table.addCell(new com.itextpdf.layout.element.Cell()
-                    .add(new Paragraph("BILL").setFontSize(12f).setBold())
-                    .setBorder(Border.NO_BORDER));
-
-            // Add "JOB NO: xxx" to the second cell, aligned to the right
-            table.addCell(new com.itextpdf.layout.element.Cell()
-                    .add(new Paragraph("BILL NO: " + "Inv"+bill.getReferenceNumber()).setFontSize(12f))
-                    .setTextAlignment(TextAlignment.RIGHT)
-                    .setBorder(Border.NO_BORDER));
-
-            document.add(table);
-
-            document.add(new Paragraph("Name: " + userName).setFontSize(12f).setMarginTop(10f));
-            document.add(new Paragraph("Address: " + address).setFontSize(12f));
-            document.add(new Paragraph("Phone: " + phone).setFontSize(12f));
-            document.add(new Paragraph("Car: " + carMake).setFontSize(12f));
-            document.add(new Paragraph("Device Mac Address: " + macAddress).setFontSize(12f));
-            document.add(new Paragraph("Car Model: " + carModel).setFontSize(12f));
-            document.add(new Paragraph("Down Payment : " + downPayment).setFontSize(12f));
-            if(jobCardOptional.isPresent()) {
-                if (jobCardOptional.get().getIsTestDrive() == 1) {
-                    document.add(new Paragraph("Test Drive: Yes").setFontSize(12f));
-                }
-            }
-            if (bill.getStatusId() == PAID) {
-                document.add(new Paragraph("Status: Paid").setFontSize(12f));
-            } else if (bill.getStatusId() == NOT_PAID) {
-                document.add(new Paragraph("Status: Not Paid").setFontSize(12f));
-            }
-            document.add(new Paragraph("Kilos: " + carKilosCovered).setFontSize(12f));
-*/
             addInvoiceHeader(document, bill, userName, address, carMake, phone, userCreator, String.valueOf(carModel));
 
             PdfFont arabicFont = createArabicFontForPdf();
@@ -685,7 +303,8 @@ public class BillPdfGeneratorITextService {
                             // Assuming JobCardNote has fields: getMessage(), getCreatedBy(), getCreatedAt()
                             billProduct.setName(productName);
                             addProductWithLanguage(productsTable, arabicFont, billProduct,createdBy,approvedByCustomerAt,productQuantity,productPrice);
-                        }else{
+                        }
+                        else{
                             String productName = "Product";
                             String productPrice = "0";
                             String productQuantity = "0";
@@ -721,27 +340,104 @@ public class BillPdfGeneratorITextService {
                         addProductWithLanguage(productsTable, arabicFont, billProduct,createdBy,approvedByCustomerAt,productQuantity,productPrice);
                         }
                     }
-                    Cell discountLabel = new Cell().add(new Paragraph("Discount").setBold().setTextAlignment(TextAlignment.LEFT))
-                            .setBorder(new SolidBorder(1)).setBackgroundColor(headerBgColor);
+                    // -------------------- DISCOUNT LOGIC --------------------
+
+                    String discountText = "0";
+                    String discountTypeText = "-";
+
+                    if (bill.getDiscount() != null && bill.getDiscount() != 0.0) {
+
+                        String discountType = bill.getDiscountType();
+                        Double discountValueBD = bill.getDiscount();
+
+                        if (discountType == null || discountType.equals("P") || discountType.trim().isEmpty()) {
+                            discountText = discountValueBD + "%";
+                            discountTypeText = "Percentage";
+                        } else if (discountType.equals("V")) {
+                            discountText = discountValueBD.toString();
+                            discountTypeText = "Value";
+                        }
+                    }
+
+// -------------------- DISCOUNT ROW --------------------
+
+                    Cell discountLabel = new Cell()
+                            .add(new Paragraph("Discount").setBold())
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
+
+                    Cell discountTypeLabel = new Cell()
+                            .add(new Paragraph("Discount Type").setBold())
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
+
+                    Cell discountTypeValue = new Cell()
+                            .add(new Paragraph(discountTypeText))
+                            .setTextAlignment(TextAlignment.CENTER)
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
+
+                    Cell emptyCell = new Cell()
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
+
                     Cell discountValue = new Cell()
-                            .add(new Paragraph(bill.getDiscount() != null ? bill.getDiscount().toString() : "0"))
-                            .setBorder(new SolidBorder(1)).setBackgroundColor(headerBgColor);
+                            .add(new Paragraph(discountText))
+                            .setTextAlignment(TextAlignment.CENTER)
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
 
-                    Cell totalLabel = new Cell(1, 4) // span across first 4 columns
-                            .add(new Paragraph("Total").setBold().setTextAlignment(TextAlignment.LEFT))
-                            .setBorder(new SolidBorder(1)).setBackgroundColor(headerBgColor);
-
-                    Cell totalValue = new Cell()
-                            .add(new Paragraph(totalPrice.toString()).setBold().setTextAlignment(TextAlignment.CENTER))
-                            .setBorder(new SolidBorder(1)).setBackgroundColor(headerBgColor);
-
+// Add discount row (5 columns exactly)
                     productsTable.addCell(discountLabel);
-                    productsTable.addCell(discountValue + "%");
+                    productsTable.addCell(discountTypeLabel);
+                    productsTable.addCell(discountTypeValue);
+                    productsTable.addCell(emptyCell);
+                    productsTable.addCell(discountValue);
+
+
+// -------------------- DOWN PAYMENT ROW --------------------
+
+                    downPayment = bill.getDownPayment() != null
+                            ? bill.getDownPayment().toString()
+                            : "0";
+
+                    Cell downPaymentLabel = new Cell(1, 4)
+                            .add(new Paragraph("Down Payment").setBold())
+                            .setTextAlignment(TextAlignment.LEFT)
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
+
+                    Cell downPaymentValue = new Cell()
+                            .add(new Paragraph(downPayment))
+                            .setTextAlignment(TextAlignment.CENTER)
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
+
+                    productsTable.addCell(downPaymentLabel);
+                    productsTable.addCell(downPaymentValue);
+
+
+// -------------------- TOTAL ROW --------------------
+
+                    Cell totalLabel = new Cell(1, 4)
+                            .add(new Paragraph("Total").setBold())
+                            .setTextAlignment(TextAlignment.LEFT)
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
+
+                    totalPrice = BigDecimal.valueOf(bill.getFinalTotalPrice());
+                    Cell totalValue = new Cell()
+                            .add(new Paragraph(totalPrice.toString()).setBold())
+                            .setTextAlignment(TextAlignment.CENTER)
+                            .setBorder(new SolidBorder(1))
+                            .setBackgroundColor(headerBgColor);
 
                     productsTable.addCell(totalLabel);
                     productsTable.addCell(totalValue);
+
                 }
-            }else {
+            }
+            else {
                 // No products → only print Total and Discount from bill
                 productsTable = new Table(new float[]{200f, 150f}); // 2 columns: Label + Value
 

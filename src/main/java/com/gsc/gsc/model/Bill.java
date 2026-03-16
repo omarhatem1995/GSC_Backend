@@ -20,6 +20,10 @@ public class Bill {
     private Double total;
     @Column(name = "discount")
     private Double discount;
+    @Column(name = "discount_type")
+    private String discountType;
+    @Column(name = "downPayment")
+    private Double downPayment;
     @Column(name = "user_id")
     private int userId;
     @Column(name = "created_at")
@@ -42,5 +46,7 @@ public class Bill {
     private Integer carId;
     @Column(name = "selected_date")
     private String date;
+    @Column(name = "final_total_price")
+    private Double finalTotalPrice;
 
 }

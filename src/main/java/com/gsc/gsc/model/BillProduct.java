@@ -22,10 +22,14 @@ public class BillProduct {
     private Integer productId;
     @Column(name = "bill_id")
     private Integer billId;
+    @Column(name = "product_manufacturer_id")
+    private Integer productManufacturerId;
     @Column(name = "quantity")
     private Integer quantity;
     @Column(name = "price")
     private Double price;
+    @Column(name = "discount")
+    private Double discount;
     @Column(name = "name")
     private String name;
     @Column(name = "created_at")

@@ -1,5 +1,6 @@
 package com.gsc.gsc.model;
 
+import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -34,4 +35,11 @@ public class Brand {
     @Column(name = "description_ar")
     private String descriptionAr;
 
+    public Brand(CreateVehicleDTO createVehicleDTO) {
+        this.code = createVehicleDTO.getCode();
+        this.nameEn = createVehicleDTO.getNameEn();
+        this.nameAr = createVehicleDTO.getNameAr();
+        this.descriptionEn = createVehicleDTO.getDescriptionEn();
+        this.descriptionAr = createVehicleDTO.getDescriptionAr();
+    }
 }

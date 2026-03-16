@@ -1,13 +1,12 @@
 package com.gsc.gsc.model;
 
-import com.gsc.gsc.seller_brand.SellerBrandDTO;
+import com.gsc.gsc.configurations.dto.CreateManufacturerDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import javax.persistence.*;
 import java.sql.Timestamp;
-import java.util.Objects;
 
 @Entity
 @Data
@@ -21,10 +20,6 @@ public class SellerBrand {
     private int id;
     @Column(name = "code")
     private String code;
-    @Column(name = "name")
-    private String name;
-    @Column(name = "description")
-    private String description;
     @Column(name = "created_at")
     private Timestamp createdAt;
     @Column(name = "updated_at")
@@ -39,11 +34,14 @@ public class SellerBrand {
     private String descriptionEn;
     @Column(name = "description_ar")
     private String descriptionAr;
+    @Column(name = "created_by")
+    private Integer createdBy;
 
-    public SellerBrand(SellerBrandDTO sellerBrandDTO) {
-        this.code = sellerBrandDTO.getCode();
-        this.name = sellerBrandDTO.getName();
-        this.description = sellerBrandDTO.getDescription();
-        this.imageUrl = sellerBrandDTO.getImageUrl();
+    public SellerBrand(CreateManufacturerDTO createManufacturerDTO) {
+        this.code = createManufacturerDTO.getCode();
+        this.nameEn = createManufacturerDTO.getNameEn();
+        this.nameAr = createManufacturerDTO.getNameAr();
+        this.descriptionEn = createManufacturerDTO.getNameEn();
+        this.descriptionAr = createManufacturerDTO.getDescriptionAr();
     }
 }

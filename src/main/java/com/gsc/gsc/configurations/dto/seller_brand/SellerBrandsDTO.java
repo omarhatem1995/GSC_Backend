@@ -1,4 +1,4 @@
-package com.gsc.gsc.seller_brand;
+package com.gsc.gsc.configurations.dto.seller_brand;
 
 
 import lombok.AllArgsConstructor;

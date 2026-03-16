@@ -70,7 +70,7 @@ public class BillController {
 
     @GetMapping("billsDetails")
     public ResponseEntity getBillsData(@RequestHeader("Authorization") String token,
-                                       @RequestHeader("Accept-Language") String langId,
+                                       @RequestHeader(value = "Accept-Language",required = false) String langId,
                                        @RequestParam("billId") Integer billId) {
         return billService.getBillsData(billId);
     }
@@ -105,14 +105,28 @@ public class BillController {
 
     @GetMapping("allBills")
     public ResponseEntity<?> getBills(
-            @RequestHeader("Accept-Language") String langId,
+            @RequestHeader(value = "Accept-Language",required = false) String langId,
             @RequestHeader("Authorization") String token,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) Integer userId,   // optional
-            @RequestParam(required = false) String search) {
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String billNumber,
+            @RequestParam(required = false) String fromDate,
+            @RequestParam(required = false) String toDate
+    ) {
 
         Pageable pageable = PageRequest.of(page, size);
-        return billService.getBills(token, userId, search, getLangId(langId), pageable);
+
+        return billService.getBills(
+                token,
+                userId,
+                search,
+                billNumber,
+                fromDate,
+                toDate,
+                getLangId(langId),
+                pageable
+        );
     }
 }

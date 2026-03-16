@@ -51,6 +51,9 @@ public class CarService implements ICarService {
         if (car.getPlateNumber() == null || car.getPlateNumber().isEmpty()) {
             messages.add("Plate number is missing");
         }
+        if (car.getChassisNumber() == null || car.getChassisNumber().isEmpty()) {
+            messages.add("Chassis number is missing");
+        }
         if (car.getLicenseNumber() == null || car.getLicenseNumber().isEmpty()) {
             messages.add("License number is missing");
         }
@@ -230,26 +233,26 @@ public class CarService implements ICarService {
 
     private void updateCarDetails(Car carExists, CarDTO dto,int userType) {
 
-        if(dto.getCreationYear() != null)
-        carExists.setCreationYear(dto.getCreationYear());
-        if(dto.getColor() != null)
-        carExists.setColor(dto.getColor());
+        /*if(dto.getCreationYear() != null)
+        carExists.setCreationYear(dto.getCreationYear());*/
+        /*if(dto.getColor() != null)
+        carExists.setColor(dto.getColor());*/
         if(dto.getDate() != null)
         carExists.setDate(dto.getDate());
         if(dto.getCoveredKilos() != null)
         carExists.setCoveredKilos(dto.getCoveredKilos());
         if(dto.getDetails() != null)
         carExists.setDetails(dto.getDetails());
-        if(dto.getChassisNumber() != null)
-        carExists.setLicenseNumber(dto.getChassisNumber());
-        if(dto.getPlateNumber() != null)
-        carExists.setPlateNumber(dto.getPlateNumber());
+/*        if(dto.getChassisNumber() != null)
+        carExists.setLicenseNumber(dto.getChassisNumber());*/
+/*        if(dto.getPlateNumber() != null)
+        carExists.setPlateNumber(dto.getPlateNumber());*/
         if(dto.getNotes() != null)
         carExists.setNotes(dto.getNotes());
         if(dto.getIsPremium() != null && dto.getIsPremium() == 1) {
 //            carExists.setExpirationDate(String.valueOf(LocalDate.now().plusYears(1)));
             if(userType == USER_TYPE){
-                if(carExists.getIsPremium() == 0 && carExists.getExpirationDate() == null){
+                if(carExists.getIsPremium() == 0 || carExists.getExpirationDate() == null){
                     carExists.setExpirationDate(String.valueOf(LocalDate.now().plusYears(1)));
                     carExists.setIsActivated((byte) 0);
                 }
@@ -465,7 +468,7 @@ public class CarService implements ICarService {
                     carDTO.setExpirationDate(String.valueOf(LocalDate.now().plusYears(1)));
                 }
                 Car car = new Car(carDTO, userId);
-                car.setProperty(1);
+                car.setIsActivated((byte) 1);
                 car = carRepository.save(car);
 
                 ReturnObject returnObject = new ReturnObject();

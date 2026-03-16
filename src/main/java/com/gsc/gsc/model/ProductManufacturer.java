@@ -12,29 +12,29 @@ import java.util.Objects;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "brand_text", schema = "gsc", catalog = "")
-public class BrandText {
+@Table(name = "product_manufacturer", schema = "gsc", catalog = "")
+public class ProductManufacturer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Id
     @Column(name = "id")
     private int id;
     @Basic
-    @Column(name = "name")
-    private String name;
+    @Column(name = "product_id")
+    private int productId;
     @Basic
-    @Column(name = "description")
-    private String description;
+    @Column(name = "seller_brand_id")
+    private int sellerBrandId;
+    @Basic
+    @Column(name = "price")
+    private Double price;
+    @Basic
+    @Column(name = "quantity")
+    private Integer quantity;
     @Basic
     @Column(name = "created_at")
     private Timestamp createdAt;
     @Basic
     @Column(name = "updated_at")
     private Timestamp updatedAt;
-    @Basic
-    @Column(name = "brand_id")
-    private int brandId;
-    @Basic
-    @Column(name = "lang_id")
-    private int langId;
 
 }

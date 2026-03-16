@@ -17,10 +17,6 @@ public class BrandService implements IBrandService {
 
     @Autowired
     private BrandRepository brandRepository;
-    @Autowired
-    private UserRepository userRepository;
-    @Autowired
-    private UserService userService;
 
     @Override
     public Optional<Car> getById(Integer id) {

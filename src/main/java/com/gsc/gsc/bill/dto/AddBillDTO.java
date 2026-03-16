@@ -22,7 +22,9 @@ public class AddBillDTO {
     String notes;
     String privateNotes;
     Double discount;
-    Integer billTypeId;
+    String discountType;
+    Double finalTotalPrice;
+    String billTypeId;
     String referenceNumber;
     Double downPayment;
     String carData;

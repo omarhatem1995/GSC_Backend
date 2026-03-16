@@ -4,6 +4,7 @@ import com.gsc.gsc.admin.dto.ActivateCarDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
 import com.gsc.gsc.admin.service.serviceImplementation.AdminService;
 import com.gsc.gsc.bill.dto.AddBillDTO;
+import com.gsc.gsc.bill.dto.UpdateBillStatusDTO;
 import com.gsc.gsc.bill.service.serviceInterface.BillService;
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.car.service.serviceImplementation.CarService;
@@ -11,6 +12,7 @@ import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.job_cards.dto.JobCardsDTO;
 import com.gsc.gsc.job_cards.service.serviceImplementation.JobCardService;
 import com.gsc.gsc.store.service.serviceImplementation.StoreService;
+import com.gsc.gsc.user.dto.LoginDTO;
 import com.gsc.gsc.user.security.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
@@ -44,20 +47,16 @@ public class AdminController {
     @Autowired
     JwtUtil jwtUtil;
 
+
+    @PostMapping({"login"})
+    public ResponseEntity<?> loginUser(@RequestBody LoginDTO loginRequestBody
+            , HttpServletResponse httpRes) {
+        return adminService.adminLogin(loginRequestBody,httpRes);
+    }
+
     @PostMapping("activate_car")
     public ResponseEntity updateCarStats(@RequestHeader("Authorization") String token, @RequestBody ActivateCarDTO activateCarDTO) {
         return adminService.activateCar(token, activateCarDTO);
-    }
-
-    @GetMapping("all_job_cards")
-    private ResponseEntity getJobCards(
-            @RequestHeader("Authorization") String token,
-            @RequestHeader(value = "Accept-Language", required = false) String lang,
-            @RequestParam(defaultValue = "0", required = false) int page,
-            @RequestParam(defaultValue = "10", required = false) int size) {
-
-        Pageable pageable = PageRequest.of(page, size);
-        return jobCardService.getJobCards(token, getLangId(lang), pageable);
     }
 
     @GetMapping("all_job_cards_without_paging")
@@ -66,11 +65,18 @@ public class AdminController {
             @RequestHeader(value = "Accept-Language", required = false) String lang,
             @RequestParam(defaultValue = "0", required = false) int page,
             @RequestParam(defaultValue = "10", required = false) int size,
-            @RequestParam(defaultValue = "", required = false) String searchQuery) {
+            @RequestParam(defaultValue = "", required = false) String searchQuery,
+            @RequestParam(required = false) Integer carId) {
 
-        return jobCardService.getJobCardsForAdmin(token, getLangId(lang), page, size, searchQuery);
+        return jobCardService.getJobCardsForAdmin(
+                token,
+                getLangId(lang),
+                page,
+                size,
+                searchQuery,
+                carId
+        );
     }
-
     @GetMapping("/all_users")
     public ResponseEntity<?> getAllUsers(
             @RequestHeader("Authorization") String token,
@@ -136,7 +142,7 @@ public class AdminController {
                                          @RequestParam(required = false) String macAddress,
                                          @RequestParam(required = false) String mobileVersion,
                                          @RequestBody AddBillDTO billDTO) {
-        return billService.createBillByAdmin(token, macAddress, mobileVersion, billDTO);
+        return billService.createProductBillByAdmin(token, macAddress, mobileVersion, billDTO);
     }
 
     @PutMapping(value = "bill/{billId}", consumes = MediaType.APPLICATION_JSON_VALUE)
@@ -148,8 +154,9 @@ public class AdminController {
 
     @PutMapping(value = "billStatus/{billId}")
     public ResponseEntity updateBillStatus(@RequestHeader("Authorization") String token,
-                                           @PathVariable Integer billId) {
-        return billService.updateBillStatus(token, billId);
+                                           @PathVariable Integer billId,
+                                           @RequestBody UpdateBillStatusDTO updateBillStatusDTO) {
+        return billService.updateBillStatus(token, billId,updateBillStatusDTO);
     }
 
     @PostMapping("send_fcm")
@@ -176,21 +183,11 @@ public class AdminController {
         return carService.deleteCarByAdmin(token, id);
     }
 
-    /*    @PutMapping("billStatus/{billId}")
-        public ResponseEntity<?> changeBillStatus(@RequestHeader("Authorization") String token,
-                                                  @PathVariable Integer billId,
-                                                  @RequestBody BillStatusDTO billStatusDTO){
-            return billService.changeBillStatus(token,billId,billStatusDTO);
-        }*/
     @PostMapping("addCar/{userId}")
     public ResponseEntity<?> addCarByAdmin(@RequestHeader("Authorization") String token,
                                            @PathVariable Integer userId,
                                            @RequestBody CarDTO carDTO) {
         return carService.addCarByAdmin(token, userId, carDTO);
     }
-    /*
 
-
-     */
-//        return carService.addToFavourite(token,invoiceProductRepository.getProductId());
 }

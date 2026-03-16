@@ -23,9 +23,11 @@ public class ProductBillDTO {
     private Integer promoId;
     private Integer quantity;
     private Integer productId;
+    private Double discount;
     private String imageUrl;
     private String productName;
     private Integer createdBy;
+    private Integer sellerBrandId;
 
     public ProductBillDTO(Integer id, String code, Double price, Integer discountId, Integer promoId, Integer quantity, Integer productId, String imageUrl, String productName, Integer createdBy) {
         this.id = id;
@@ -44,7 +46,8 @@ public class ProductBillDTO {
         this.code = billProduct.getName();
         this.productId = billProduct.getProductId();
         this.price = billProduct.getPrice();
-        this.id = billProduct.getBillId();
+        this.discount = billProduct.getDiscount();
+        this.id = billProduct.getProductId();
         this.quantity = billProduct.getQuantity();
         this.productName = billProduct.getName();
     }

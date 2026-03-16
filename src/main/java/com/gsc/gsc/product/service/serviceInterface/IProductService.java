@@ -9,7 +9,6 @@ import java.util.Optional;
 
 public interface IProductService<T> {
     Optional<Car> getById(Integer id);
-    ResponseEntity<T> create(String token , ProductDTO dto) throws IOException;
 //    ResponseEntity<?> getProducts(String token,Integer langId);
     ResponseEntity<T> update(String token ,Integer id, ProductDTO dto);
     ResponseEntity<T> delete(Integer id);

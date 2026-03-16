@@ -7,28 +7,27 @@ import com.gsc.gsc.constants.ReturnObjectPaging;
 import com.gsc.gsc.model.*;
 import com.gsc.gsc.model.view.ProductDetailsView;
 import com.gsc.gsc.product.dto.*;
+import com.gsc.gsc.product.dto.productList.ProductListDTO;
 import com.gsc.gsc.product.service.serviceInterface.IProductService;
 import com.gsc.gsc.repo.*;
-import com.gsc.gsc.seller_brand.SellerBrandsDTO;
-import com.gsc.gsc.utilities.FirebaseMessagingService;
 import com.gsc.gsc.utilities.ImgBBService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
-import org.springframework.data.domain.Pageable;
-
+import javax.transaction.Transactional;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
-import static com.gsc.gsc.utilities.Constants.GENERAL_BRAND_ID;
-import static com.gsc.gsc.utilities.LanguageConstants.ARABIC;
 import static com.gsc.gsc.utilities.LanguageConstants.ENGLISH;
 
 @Service
@@ -42,38 +41,28 @@ public class ProductService implements IProductService {
     @Autowired
     private ProductRepository productRepository;
     @Autowired
+    private ProductVehicleRepository productVehicleRepository;
+    @Autowired
+    private ProductManufacturerRepository productManufacturerRepository;
+    @Autowired
+    private ProductOeNumberRepository productOeNumberRepository;
+    @Autowired
     private ProductStoreRepository productStoreRepository;
     @Autowired
     private DiscountRepository discountRepository;
     @Autowired
     private PromoRepository promoRepository;
     @Autowired
-    private ProductDetailsViewRepository productDetailsViewRepository;
-    @Autowired
     private OeNumberRepository oeNumberRepository;
-    @Autowired
-    private ProductBrandRepository productBrandRepository;
-    @Autowired
-    private StoreRepository storeRepository;
-    @Autowired
-    private BillProductRepository billProductRepository;
-    @Autowired
-    private ProductSellerBrandRepository productSellerBrandRepository;
-    @Autowired
-    private ProductModelRepository productModelRepository;
     @Autowired
     private ModelRepository modelRepository;
     @Autowired
     private BrandRepository brandRepository;
     @Autowired
-    private BrandTextRepository brandTextRepository;
-    @Autowired
     private SellerBrandRepository sellerBrandRepository;
-    @Autowired
-    private FirebaseMessagingService firebaseMessagingService;
 
     @Autowired
-    private  ImgBBService imgBBService;
+    private ImgBBService imgBBService;
     @Autowired
     private ProductImagesRepository productImagesRepository;
 
@@ -82,25 +71,25 @@ public class ProductService implements IProductService {
         return Optional.empty();
     }
 
-    public ResponseEntity findProductsForStoreId(String token , Integer storeId){
+    public ResponseEntity findProductsForStoreId(String token, Integer storeId) {
         ReturnObject returnObject = new ReturnObject();
         Integer userId = getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
         if (userId != null && userAdmin.getAccountTypeId() == ADMIN_TYPE) {
             Optional<List<ProductStore>> productsStoreList = productStoreRepository.findAllByStoreId(storeId);
-            if(productsStoreList.isPresent()){
+            if (productsStoreList.isPresent()) {
                 returnObject.setMessage("Loaded Successfully");
                 returnObject.setStatus(true);
                 returnObject.setData(productsStoreList.get());
                 return ResponseEntity.ok(returnObject);
-            }else{
+            } else {
                 returnObject.setMessage("No Products Added");
                 returnObject.setData(null);
                 returnObject.setStatus(true);
                 return ResponseEntity.ok(returnObject);
 
             }
-        }else{
+        } else {
             returnObject.setMessage("User UnAuthorized");
             returnObject.setData(null);
             returnObject.setStatus(false);
@@ -108,131 +97,101 @@ public class ProductService implements IProductService {
         }
     }
 
-    @Override
-    public ResponseEntity create(String token , ProductDTO dto) throws IOException {
+    @Transactional
+    public ResponseEntity<ReturnObject> createProduct(String token, CreateProductRequest request) {
         ReturnObject returnObject = new ReturnObject();
         Integer userId = getUserIdFromToken(token);
         User userAdmin = userRepository.findUserById(userId);
-        if (userId != null && userAdmin.getAccountTypeId() == ADMIN_TYPE) {
-        if(dto.getSellerBrandsList() == null ||  dto.getSellerBrandsList().isEmpty()){
-            returnObject.setMessage("Seller brand list can't be empty");
-            returnObject.setData(dto.getCode());
+        if (userId == null || userAdmin.getAccountTypeId() != ADMIN_TYPE) {
+            returnObject.setMessage("This is not admin user");
+            returnObject.setData(null);
+            returnObject.setStatus(false);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+        if(productRepository.findByCode(request.getCode()).isPresent()){
+            returnObject.setMessage("Product with the same code already exists");
+            returnObject.setData(null);
             returnObject.setStatus(false);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
 
-            Optional<Product> optionalProduct = productRepository.findByCode(dto.getCode());
-            if (optionalProduct.isPresent()) {
-                returnObject.setData(optionalProduct.get());
-                returnObject.setMessage("This product code is already exists");
-                returnObject.setStatus(false);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+        Product product = new Product();
+        product.setCode(request.getCode());
+        product.setNameEn(request.getNameEn());
+        product.setNameAr(request.getNameAr());
+        product.setDescriptionEn(request.getDescriptionEn());
+        product.setDescriptionAr(request.getDescriptionAr());
+        product.setPrice(request.getPrice());
+        product.setCost(request.getCost());
+
+        product = productRepository.save(product);
+        if (request.getImage() != null && !request.getImage().isEmpty()) {
+            try {
+                String imageUrl = imgBBService.uploadImage(request.getImage());
+
+                ProductImages productImage = new ProductImages();
+                productImage.setProductId(product.getId());
+                productImage.setUrl(imageUrl);
+                productImage.setCounter(1);
+
+                productImagesRepository.save(productImage);
+
+                product.setImageUrl(imageUrl);
+                productRepository.save(product);
+            }catch (IOException ioException){
+                System.out.println("Error in Uploading image :" + request.getCode());
             }
-            if(dto.getBrandId() != null) {
-                Optional<Brand> brandOptional = brandRepository.findById(dto.getBrandId());
-                if(brandOptional.isEmpty()){
-                    dto.setBrandId(GENERAL_BRAND_ID);
-                }
-            }else{
-                dto.setBrandId(GENERAL_BRAND_ID);
-            }
-            Optional<Store> storeOptional = storeRepository.findById(dto.getStoreId());
-            if(storeOptional.isPresent()) {
-
-
-                Product product = new Product();
-                ProductStore productStore = new ProductStore();
-
-                product.setCode(dto.getCode());
-                product.setPrice(dto.getPrice());
-                product.setCost(dto.getCost());
-
-//                updateForeignKeys(product, dto);
-
-                product = productRepository.save(product);
-                if (dto.getImage() != null && !dto.getImage().isEmpty()) {
-
-                    String imageUrl = imgBBService.uploadImage(dto.getImage());
-
-                    ProductImages productImage = new ProductImages();
-                    productImage.setProductId(product.getId());
-                    productImage.setUrl(imageUrl);
-                    productImage.setCounter(1);
-
-                    productImagesRepository.save(productImage);
-                }
-
-                productStore.setProductId(product.getId());
-                productStore.setStoreId(dto.getStoreId());
-                productStore.setQuantity(dto.getQuantity());
-                productStore.setLocation(dto.getLocation());
-                for(String oeNumber : dto.getOeNumber()) {
-                    productStore.setOeNumber(oeNumber);
-
-                    // Check if OeNumber already exists for the given brandId, productId, and oeNumber
-                    List<OeNumber> existingOeNumbers = oeNumberRepository.findAllByBrandIdAndProductIdAndOeNumber(product.getId(), dto.getBrandId(), oeNumber);
-
-                    // If the list is empty, then the OeNumber doesn't exist and can be added
-                    if (existingOeNumbers.isEmpty()) {
-                        OeNumber newOeNumber = new OeNumber();
-                        newOeNumber.setProductId(product.getId());
-                        newOeNumber.setBrandId(dto.getBrandId());
-                        newOeNumber.setOeNumber(oeNumber);
-                        oeNumberRepository.save(newOeNumber);
-                    }
-                }
-                productStoreRepository.save(productStore);
-
-
-                ProductBrand productBrand = new ProductBrand();
-                productBrand.setProductId(product.getId());
-                productBrand.setPrice(dto.getPrice());
-                productBrand.setInfo(dto.getInfo());
-                productBrand.setQuantity(dto.getQuantity());
-                productBrand.setBrandId(dto.getBrandId());
-                if(dto.getPartNo() != null) {
-                    productBrand.setPartNo(dto.getPartNo());
-                }else{
-                    productBrand.setPartNo(product.getCode());
-                }
-                productBrandRepository.save(productBrand);
-                try {
-                    for (int i = 0; i < dto.getSellerBrandsList().size(); i++) {
-                        ProductSellerBrand productSellerBrand = new ProductSellerBrand();
-                        productSellerBrand.setProductId(product.getId());
-                        productSellerBrand.setSellerBrandsId(dto.getSellerBrandsList().get(i));
-                        productSellerBrandRepository.save(productSellerBrand);
-                    }
-                }catch (Exception exception){
-                    System.out.println("exception " + exception.getMessage());
-                }
-
-                dto.setId(product.getId());
-
-                returnObject.setMessage("Created Successfully");
-                returnObject.setStatus(true);
-                returnObject.setData(dto);
-
-                return ResponseEntity.ok(returnObject);
-            }else{
-
+        }
+        // manufacturers
+        for (ManufacturerRequest m : request.getManufacturers()) {
+            Optional<SellerBrand> brandOptional = sellerBrandRepository
+                    .findById(m.getSellerBrandId());
+            if(brandOptional.isEmpty()){
+                returnObject.setMessage("Seller Brand not found");
                 returnObject.setData(null);
                 returnObject.setStatus(false);
-                returnObject.setMessage("Store Doesn't exist");
-
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
             }
-        }else{
-            returnObject.setData(null);
-            returnObject.setStatus(false);
-            returnObject.setMessage("This user isn't Authorized");
+            ProductManufacturer pm = new ProductManufacturer();
+            pm.setProductId(product.getId());
+            pm.setSellerBrandId(m.getSellerBrandId());
+            pm.setPrice(m.getPrice());
+            pm.setQuantity(m.getQuantity());
 
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+            productManufacturerRepository.save(pm);
         }
+
+        // OE numbers
+        for (String oe : request.getOeNumbers()) {
+
+            ProductOeNumber oeNumber = new ProductOeNumber();
+            oeNumber.setProductId(product.getId());
+            oeNumber.setOeNumber(oe);
+
+            productOeNumberRepository.save(oeNumber);
+        }
+
+        // vehicles
+        for (VehicleCompatibilityRequest v : request.getVehicles()) {
+
+            ProductVehicle pv = new ProductVehicle();
+            pv.setProductId(product.getId());
+            pv.setModelId(v.getModelId());
+            pv.setYearFrom(v.getYearFrom());
+            pv.setYearTo(v.getYearTo());
+
+            productVehicleRepository.save(pv);
+        }
+        returnObject.setStatus(true);
+        returnObject.setData(null);
+        returnObject.setMessage("Added Product Successfully");
+        return ResponseEntity.status(HttpStatus.OK).body(returnObject);
     }
 
-    public ResponseEntity<?> findOENumbersByBrandAndProductIds(OeNumber oeNumber){
-        List<OeNumber> oeNumberList = oeNumberRepository.findAllByBrandIdAndProductId(oeNumber.getBrandId(),oeNumber.getProductId());
+
+
+    public ResponseEntity<?> findOENumbersByBrandAndProductIds(OeNumber oeNumber) {
+        List<OeNumber> oeNumberList = oeNumberRepository.findAllByBrandIdAndProductId(oeNumber.getBrandId(), oeNumber.getProductId());
         ReturnObject returnObject = new ReturnObject();
         returnObject.setStatus(true);
         returnObject.setMessage("Successfully Loaded");
@@ -243,58 +202,23 @@ public class ProductService implements IProductService {
     private void updateForeignKeys(Product product, ProductDTO dto) {
         Optional<Discount> discountOptional = discountRepository.findById(dto.getDiscountId());
         Optional<Promo> promoOptional = promoRepository.findById(dto.getPromoId());
-        if(discountOptional.isPresent()){
+        if (discountOptional.isPresent()) {
             product.setDiscountId(dto.getDiscountId());
         }
-        if(promoOptional.isPresent()){
+        if (promoOptional.isPresent()) {
             product.setPromoId(dto.getPromoId());
         }
 
     }
 
-//    @Override
-    public ResponseEntity<?> getProducts(String token ,Integer langId ,Pageable pageable) {
-        ReturnObjectPaging returnObject = new ReturnObjectPaging();
-        if (token != null) {
-            returnObject.setMessage("Loaded Successfully");
-            returnObject.setStatus(true);
-            Page<GetProductsDTO> productsDTOList = productRepository.findProducts2(langId, pageable);
+    //    @Override
 
-
-            for (GetProductsDTO productsDTO : productsDTOList) {
-                List<ProductSellerBrand> productSellerBrandList = productSellerBrandRepository.findAllByProductId(productsDTO.getId());
-                List<SellerBrandsDTO> brands = new ArrayList<>();
-                List<Integer> brandIds = new ArrayList<>();
-                for(ProductSellerBrand productSellerBrand :productSellerBrandList) {
-                    Optional<BrandDTO> brandDTOOptional = brandRepository.findBrandsByLangIdAndBrandId(ENGLISH, productSellerBrand.getSellerBrandsId());
-                    if (brandDTOOptional.isPresent()) {
-                        BrandDTO brandDTO = brandDTOOptional.get();
-                        brandIds.add(productSellerBrand.getSellerBrandsId());
-                        brands.add(new SellerBrandsDTO(productSellerBrand.getSellerBrandsId(),brandDTO.getBrandName(),brandDTO.getBrandDescription()));
-                    }
-                }
-                productsDTO.setBrandIds(brandIds);
-                productsDTO.setBrands(brands);
-            }
-            List<GetProductsDTO> finalProductsList = new ArrayList<>(productsDTOList.getContent());
-
-            returnObject.setData(finalProductsList);
-            returnObject.setTotalPages(productsDTOList.getTotalPages());
-            returnObject.setTotalCount(productsDTOList.getTotalElements());
-          return  ResponseEntity.ok(returnObject);
-        }else{
-            returnObject.setMessage("There is no Token");
-            returnObject.setStatus(false);
-            returnObject.setData(new ArrayList<>());
-            return  ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-        }
-    }
-    public ResponseEntity<?> getProductsWithCount(String token ,Integer langId ,Pageable pageable) {
+    public ResponseEntity<?> getProductsWithCount(String token, Integer langId, Pageable pageable) {
         ReturnObject returnObject = new ReturnObject();
         if (token != null) {
             returnObject.setMessage("Loaded Successfully");
             returnObject.setStatus(true);
-            Page<GetProductsDTO> productsDTOList = productRepository.findProducts2(langId,pageable);
+            Page<GetProductsDTO> productsDTOList = productRepository.findProducts2(langId, pageable);
 
             Map<Integer, GetProductsDTO> productDTOMap = new HashMap<>();
 
@@ -312,226 +236,97 @@ public class ProductService implements IProductService {
             productsDTO.setSize(productRepository.count());
 
             returnObject.setData(productsDTO);
-          return  ResponseEntity.ok(returnObject);
-        }else{
-            returnObject.setMessage("There is no Token");
-            returnObject.setStatus(false);
-            returnObject.setData(new ArrayList<>());
-            return  ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-        }
-    }
-
-    public ResponseEntity<?> getProductsByManufacture(String token, Integer brandId, Pageable pageable) {
-        ReturnObjectPaging returnObject = new ReturnObjectPaging();
-        if (token != null) {
-            Page<GetProductsDTO> productDTOS = productRepository.findProductsByManufactureId(1,brandId,pageable);
-//            Page<ProductDetailsView> productDetailsViewList = productDetailsViewRepository.findAllByLangId(1, pageable);
-            Map<Integer, GetProductsDTO> productDTOMap = new HashMap<>();
-
-            for (GetProductsDTO dto : productDTOS) {
-                if (productDTOMap.containsKey(dto.getId())) {
-                    productDTOMap.get(dto.getId()).addBrandId(dto.getBrandIds().get(0));
-                } else {
-                    productDTOMap.put(dto.getId(), dto);
-                }
-            }
-
-            List<GetProductsDTO> finalProductsList = new ArrayList<>(productDTOMap.values());
-
-            returnObject.setData(finalProductsList);
-            returnObject.setTotalPages(productDTOS.getTotalPages());
-            returnObject.setTotalCount(productDTOS.getTotalElements());
-
-            returnObject.setMessage("Loaded Successfully");
-            returnObject.setStatus(true);
             return ResponseEntity.ok(returnObject);
         } else {
             returnObject.setMessage("There is no Token");
             returnObject.setStatus(false);
-            returnObject.setData(null);
+            returnObject.setData(new ArrayList<>());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
         }
     }
-    public ResponseEntity<?> findProductDetailsById(String token,Integer langId, Integer productId) {
-        ReturnObject returnObject = new ReturnObject();
-        if (token != null) {
-            List<ProductDetailsView> productDetailsViewList = productDetailsViewRepository.findByProductIdAndLangId(productId,langId);
-            if(!productDetailsViewList.isEmpty()) {
-                ProductDetailsDTO productDetailsDTO = new ProductDetailsDTO(productDetailsViewList.get(0));
-                List<SellerBrand> sellerBrands = new ArrayList<>();
-                List<CompatibleVehiclesDTO> compatibleVehiclesDTOList = new ArrayList<>();
-                List<ProductSellerBrand> productSellerBrandsList =  productSellerBrandRepository.findAllByProductId(productDetailsViewList.get(0).getProductId());
-                List<ProductBrandDTO> productBrands = new ArrayList<>();
-                    List<ProductBrand> productBrand = productBrandRepository.findAllByProductId(productDetailsDTO.getProductId());
-                    for(ProductBrand productBrand1 : productBrand){
-                        productBrands.add(new ProductBrandDTO(
-                                productBrand1.getId(),productBrand1.getBrandId(),productBrand1.getProductId(),
-                                productBrand1.getPrice(),productBrand1.getQuantity(),productBrand1.getInfo(),
-                                brandRepository.getById(productBrand1.getBrandId()).getImageUrl(),productBrand1.getPartNo()));
-                    }
-                if(!productSellerBrandsList.isEmpty())
-                for (ProductSellerBrand productSellerBrand : productSellerBrandsList) {
-                    SellerBrand sellerBrand = sellerBrandRepository.findById(productSellerBrand.getSellerBrandsId()).get();
-                    sellerBrands.add(sellerBrand);
-                }
-                List<ProductModel> productModelList =  productModelRepository.findAllByProductId(productDetailsViewList.get(0).getProductId());
-                if(!productModelList.isEmpty())
-                for (ProductModel productModel : productModelList) {
-                    Model model = modelRepository.findById(productModel.getModelId()).get();
-                    CompatibleVehiclesDTO compatibleVehiclesDTO = new CompatibleVehiclesDTO();
-                    compatibleVehiclesDTO.setVehicleCode(model.getCode());
-                    compatibleVehiclesDTO.setCreationYear(model.getCreationYear());
-                    compatibleVehiclesDTO.setBrandId(model.getBrandId());
-                    compatibleVehiclesDTO.setBrandName(brandTextRepository.findByBrandIdAndLangId(model.getBrandId(), langId).get().getName());
-                    compatibleVehiclesDTO.setImageUrl(brandRepository.findById(model.getBrandId()).get().getImageUrl());
-                    compatibleVehiclesDTOList.add(compatibleVehiclesDTO);
-                }
-                productDetailsDTO.setProductBrandList(productBrands);
-                productDetailsDTO.setCompatibleVehiclesDTOList(compatibleVehiclesDTOList);
-                productDetailsDTO.setSellerBrandsList(sellerBrands);
-                Optional<List<ProductStore>> productStoresOptional = productStoreRepository.findAllByProductId(productId);
-                Optional<List<BillProduct>> billProducts = billProductRepository.findAllByProductId(productId);
-                double minimum = 0.0;
-                double maximum = 0.0;
-                List<OeNumber> oeNumberList = oeNumberRepository.findAllByProductId(productId);
-                if (productStoresOptional.isPresent()) {
-                    Integer totalQuantity = 0;
-                    for (int i = 0; i < productStoresOptional.get().size(); i++) {
-                        totalQuantity += productStoresOptional.get().get(i).getQuantity();
-                    }
-                    if (billProducts.isPresent()) {
-                        for (BillProduct product : billProducts.get()) {
-                            if(product != null) {
-                                if(product.getPrice() != null) {
-                                    if (product.getPrice() > maximum) {
-                                        maximum = product.getPrice();
-                                    }
-                                }else{
-                                    maximum = 0;
-                                }
-                            }else{
-                                maximum = 0;
-                            }
-                            if(product != null) {
-                                if(product.getPrice() != null) {
-                                    if (product.getPrice() < minimum) {
-                                        minimum = product.getPrice();
-                                    }
-                                }else{
-                                    minimum = 0;
-                                }
-                            }else{
-                                minimum = 0;
-                            }
-                        }
-                    }
-                    productDetailsDTO.setCompatibleOeNumbersList(oeNumberList);
-                    productDetailsDTO.setQuantity(totalQuantity);
-                    productDetailsDTO.setMaximum(maximum);
-                    productDetailsDTO.setMinimum(minimum);
-                }
-                returnObject.setMessage("Loaded Successfully");
-                returnObject.setStatus(true);
-                returnObject.setData(productDetailsDTO);
-                return ResponseEntity.ok(returnObject);
-            }else{
-                returnObject.setMessage("There is no Info for this product");
-                returnObject.setStatus(false);
-                returnObject.setData(null);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-            }
-
-        } else {
-            returnObject.setMessage("There is no Token");
-            returnObject.setStatus(false);
-            returnObject.setData(null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-        }
-    }
-
 
     @Override
     public ResponseEntity update(String token, Integer productId, ProductDTO dto) {
-            ReturnObject returnObject = new ReturnObject();
-            Integer userId = getUserIdFromToken(token);
-            User userAdmin = userRepository.findUserById(userId);
+        ReturnObject returnObject = new ReturnObject();
+        Integer userId = getUserIdFromToken(token);
+        User userAdmin = userRepository.findUserById(userId);
 
-            if (userId != null && userAdmin.getAccountTypeId() == ADMIN_TYPE) {
-                Optional<Product> existingProductOptional = productRepository.findById(productId);
+        if (userId != null && userAdmin.getAccountTypeId() == ADMIN_TYPE) {
+            Optional<Product> existingProductOptional = productRepository.findById(productId);
 
-                if (existingProductOptional.isPresent()) {
-                    Product existingProduct = existingProductOptional.get();
+            if (existingProductOptional.isPresent()) {
+                Product existingProduct = existingProductOptional.get();
 
-                    // Check if the provided code is already in use by another product
-                    Optional<Product> productWithSameCode = productRepository.findByCode(dto.getCode());
-                    if (productWithSameCode.isPresent() && !productWithSameCode.get().getId().equals(productId)) {
-                        returnObject.setData(productWithSameCode.get());
-                        returnObject.setMessage("This product code is already in use");
-                        returnObject.setStatus(false);
-                        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-                    }
+                // Check if the provided code is already in use by another product
+                Optional<Product> productWithSameCode = productRepository.findByCode(dto.getCode());
+                if (productWithSameCode.isPresent() && !productWithSameCode.get().getId().equals(productId)) {
+                    returnObject.setData(productWithSameCode.get());
+                    returnObject.setMessage("This product code is already in use");
+                    returnObject.setStatus(false);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                }
 
-                    // Update fields in the existing product
-                    existingProduct.setCode(dto.getCode());
-                    existingProduct.setPrice(dto.getPrice());
-                    existingProduct.setCost(dto.getCost());
+                // Update fields in the existing product
+                existingProduct.setCode(dto.getCode());
+                existingProduct.setPrice(dto.getPrice());
+                existingProduct.setCost(dto.getCost());
 
-                    updateForeignKeys(existingProduct, dto);
+                updateForeignKeys(existingProduct, dto);
 
-                    // Save the updated product
-                    existingProduct = productRepository.save(existingProduct);
+                // Save the updated product
+                existingProduct = productRepository.save(existingProduct);
 
-                    // Update information in the product store
-                    Optional<ProductStore> productStoreOptional = productStoreRepository.findByProductId(existingProduct.getId());
-                    if(productStoreOptional.isPresent()) {
-                        ProductStore productStore = productStoreOptional.get();
-                        productStore.setStoreId(dto.getStoreId());
-                        productStore.setQuantity(dto.getQuantity());
-                        if(!dto.getOeNumber().isEmpty())
+                // Update information in the product store
+                Optional<ProductStore> productStoreOptional = productStoreRepository.findByProductId(existingProduct.getId());
+                if (productStoreOptional.isPresent()) {
+                    ProductStore productStore = productStoreOptional.get();
+                    productStore.setStoreId(dto.getStoreId());
+                    productStore.setQuantity(dto.getQuantity());
+                    if (!dto.getOeNumber().isEmpty())
                         productStore.setOeNumber(dto.getOeNumber().get(0));
-                        productStore.setLocation(dto.getLocation());
-                        productStoreRepository.save(productStore);
-                    }
-                    // Update information in the product brand
-                    Optional<ProductBrand> productBrandOptional = productBrandRepository.findByProductId(existingProduct.getId());
-                    if(productBrandOptional.isPresent()) {
-                        ProductBrand productBrand = productBrandOptional.get();
-                        productBrand.setPrice(dto.getPrice());
-                        productBrand.setInfo(dto.getInfo());
-                        productBrand.setQuantity(dto.getQuantity());
-                        productBrand.setBrandId(dto.getBrandId());
-                        productBrand.setPartNo(dto.getPartNo());
-                        productBrandRepository.save(productBrand);
-                    }
-                    // Update information in the product seller brands
-                    productSellerBrandRepository.deleteAllByProductId(existingProduct.getId());
-                    if(dto.getSellerBrandsList() != null)
+                    productStore.setLocation(dto.getLocation());
+                    productStoreRepository.save(productStore);
+                }
+/*                // Update information in the product brand
+                Optional<ProductBrand> productBrandOptional = productBrandRepository.findByProductId(existingProduct.getId());
+                if (productBrandOptional.isPresent()) {
+                    ProductBrand productBrand = productBrandOptional.get();
+                    productBrand.setPrice(dto.getPrice());
+                    productBrand.setInfo(dto.getInfo());
+                    productBrand.setQuantity(dto.getQuantity());
+                    productBrand.setBrandId(dto.getBrandId());
+                    productBrand.setPartNo(dto.getPartNo());
+                    productBrandRepository.save(productBrand);
+                }*/
+                // Update information in the product seller brands
+                /*productSellerBrandRepository.deleteAllByProductId(existingProduct.getId());
+                if (dto.getSellerBrandsList() != null)
                     for (Integer sellerBrandId : dto.getSellerBrandsList()) {
                         ProductSellerBrand productSellerBrand = new ProductSellerBrand();
                         productSellerBrand.setProductId(existingProduct.getId());
                         productSellerBrand.setSellerBrandsId(sellerBrandId);
                         productSellerBrandRepository.save(productSellerBrand);
-                    }
+                    }*/
 
-                    returnObject.setMessage("Product Updated Successfully");
-                    returnObject.setStatus(true);
-                    returnObject.setData(existingProduct);
+                returnObject.setMessage("Product Updated Successfully");
+                returnObject.setStatus(true);
+                returnObject.setData(existingProduct);
 
-                    return ResponseEntity.ok(returnObject);
-                } else {
-                    returnObject.setData(null);
-                    returnObject.setStatus(false);
-                    returnObject.setMessage("Product with ID " + productId + " not found");
-
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-                }
+                return ResponseEntity.ok(returnObject);
             } else {
                 returnObject.setData(null);
                 returnObject.setStatus(false);
-                returnObject.setMessage("User is not authorized");
+                returnObject.setMessage("Product with ID " + productId + " not found");
 
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
             }
+        } else {
+            returnObject.setData(null);
+            returnObject.setStatus(false);
+            returnObject.setMessage("User is not authorized");
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+        }
 
     }
 
@@ -539,7 +334,130 @@ public class ProductService implements IProductService {
     public ResponseEntity delete(Integer id) {
         return null;
     }
+    public ResponseEntity<?> getProductsV3(GetProductsRequest request) {
+        ReturnObjectPaging returnObjectPaging = new ReturnObjectPaging();
 
+        // 1️⃣ Fetch paginated products
+        Page<Product> productList = productRepository.findProductsV3(
+                request.getBrandId(),
+                request.getModelCode(),
+                request.getYearFrom(),
+                request.getYearTo(),
+                request.getOeNumber(),
+                PageRequest.of(request.getPage(), request.getSize())
+        );
+
+        List<Product> products = productList.getContent();
+
+        // 2️⃣ Map to DTO
+        List<ProductListDTO> productDTOs = products.stream().map(product -> {
+            ProductListDTO dto = new ProductListDTO();
+            dto.setId(product.getId());
+            dto.setCode(product.getCode());
+            dto.setNameEn(product.getNameEn());
+            dto.setNameAr(product.getNameAr());
+            dto.setDescriptionEn(product.getDescriptionEn());
+            dto.setDescriptionAr(product.getDescriptionAr());
+            dto.setImageUrl(product.getImageUrl());
+            dto.setPrice(product.getPrice());
+            dto.setCost(product.getCost());
+            dto.setDiscountId(product.getDiscountId());
+            dto.setPromoId(product.getPromoId());
+            dto.setProductTypeId(product.getProductTypeId());
+
+            // 3️⃣ Fetch manufacturer info for this product
+            List<ProductManufacturerDTO> manufacturers = productManufacturerRepository
+                    .findAllByProductIdWithBrand(product.getId());
+
+            dto.setManufacturers(manufacturers);
+
+            return dto;
+        }).collect(Collectors.toList());
+
+        // 4️⃣ Return paging response
+        returnObjectPaging.setTotalPages(productList.getTotalPages());
+        returnObjectPaging.setStatus(true);
+        returnObjectPaging.setTotalCount(productList.getTotalElements());
+        returnObjectPaging.setData(productDTOs);
+
+        return ResponseEntity.ok(returnObjectPaging);
+    }
+    public ResponseEntity<?> getProductByIdV3(Integer productId) {
+        ReturnObject returnObject = new ReturnObject();
+        Optional<Product> productOptional = productRepository.findById(productId);
+
+        if(productOptional.isEmpty()){
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            returnObject.setMessage("Product Not found");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        Product product = productOptional.get();
+        ProductDetailsDTO productDetailsDTO = new ProductDetailsDTO();
+        productDetailsDTO.setId(productId);
+        productDetailsDTO.setCode(product.getCode());
+        productDetailsDTO.setDescription(product.getDescriptionEn());
+        productDetailsDTO.setNameEn(product.getNameEn());
+        productDetailsDTO.setImageUrl(product.getImageUrl());
+
+
+        List<ProductOeNumber> productOeNumberList = productOeNumberRepository.findAllByProductId(productId);
+
+        if(!productOeNumberList.isEmpty()) {
+            ArrayList<String> compatibleOeNumbers = new ArrayList<>();
+            for(ProductOeNumber productOeNumber : productOeNumberList){
+                compatibleOeNumbers.add(productOeNumber.getOeNumber());
+            }
+            productDetailsDTO.setOeNumbers(compatibleOeNumbers);
+        }
+
+        List<ProductManufacturer> productManufacturerList = productManufacturerRepository.findAllByProductId(productId);
+        if(!productManufacturerList.isEmpty()) {
+            ArrayList<ProductManufacturerDTO> manufacturerList = new ArrayList<>();
+            for(ProductManufacturer productManufacturer : productManufacturerList){
+                ProductManufacturerDTO productManufacturerDTO = new ProductManufacturerDTO();
+                productManufacturerDTO.setPrice(productManufacturer.getPrice());
+                productManufacturerDTO.setQuantity(productManufacturer.getQuantity());
+                productManufacturerDTO.setSellerBrandId(productManufacturer.getSellerBrandId());
+                Optional<SellerBrand> sellerBrandOptional = sellerBrandRepository.findById(productManufacturer.getSellerBrandId());
+                if(sellerBrandOptional.isPresent()){
+                    productManufacturerDTO.setSellerBrandName(sellerBrandOptional.get().getNameEn());
+                    productManufacturerDTO.setSellerBrandImageUrl(sellerBrandOptional.get().getImageUrl());
+                }
+                manufacturerList.add(productManufacturerDTO);
+            }
+            productDetailsDTO.setStores(manufacturerList);
+        }
+
+        List<ProductVehicle> productVehicleList = productVehicleRepository.findAllByProductId(productId);
+        if(!productVehicleList.isEmpty()){
+            ArrayList<CompatibleVehiclesDTO> compatibleVehiclesDTOArrayList = new ArrayList<>();
+            for(ProductVehicle productVehicle : productVehicleList){
+                CompatibleVehiclesDTO compatibleVehiclesDTO = new CompatibleVehiclesDTO();
+                Optional<Model> modelOptional = modelRepository.findById(productVehicle.getModelId());
+                if(modelOptional.isPresent()){
+                    Model model = modelOptional.get();
+                    compatibleVehiclesDTO.setVehicleCode(model.getCode());
+                    compatibleVehiclesDTO.setCreationYear(model.getCreationYear());
+                    compatibleVehiclesDTO.setBrandId(model.getBrandId());
+                    Optional<Brand> brandOptional = brandRepository.findById(model.getBrandId());
+                    if(brandOptional.isPresent()){
+                        Brand brand = brandOptional.get();
+                        compatibleVehiclesDTO.setBrandName(brand.getNameEn());
+                        compatibleVehiclesDTO.setBrandImageUrl(brand.getImageUrl());
+                    }
+                }
+                compatibleVehiclesDTOArrayList.add(compatibleVehiclesDTO);
+            }
+            productDetailsDTO.setCompatibleVehicles(compatibleVehiclesDTOArrayList);
+        }
+        returnObject.setMessage("Loaded Successfully");
+        returnObject.setData(productDetailsDTO);
+        returnObject.setStatus(true);
+
+        return ResponseEntity.status(HttpStatus.OK).body(returnObject);
+    }
 
     public Integer getUserIdFromToken(String token) {
 

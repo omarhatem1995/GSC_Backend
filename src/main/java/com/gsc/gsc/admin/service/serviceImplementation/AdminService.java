@@ -14,6 +14,8 @@ import com.gsc.gsc.model.Point;
 import com.gsc.gsc.model.User;
 import com.gsc.gsc.repo.*;
 import com.gsc.gsc.user.dto.GetAllUsers;
+import com.gsc.gsc.user.dto.LoginDTO;
+import com.gsc.gsc.user.security.AuthenticationService;
 import com.gsc.gsc.user.security.util.JwtUtil;
 import com.gsc.gsc.user.service.servicesImplementation.UserService;
 import com.gsc.gsc.utilities.FirebaseMessagingService;
@@ -32,6 +34,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import javax.servlet.http.HttpServletResponse;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -40,6 +43,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
+import static com.gsc.gsc.user.service.servicesImplementation.UserService.cleanMobileNumber;
 
 @Service
 public class AdminService implements IAdminService {
@@ -65,6 +69,33 @@ public class AdminService implements IAdminService {
     @Autowired
     private PointRepository pointRepository;
 
+    @Autowired
+    private AuthenticationService authenticationService;
+    public ResponseEntity<?> adminLogin(LoginDTO loginDTO, HttpServletResponse httpRes) {
+
+        ReturnObject returnObject = new ReturnObject();
+
+        User user = userRepository.findByPhone(loginDTO.getPhone());
+
+        if (user == null) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("User not found");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+        }
+
+        // Allow login only for admins
+        if (!user.getAccountTypeId().equals(ADMIN_TYPE)) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Forbidden: Admin access only");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        return authenticationService.login(
+                loginDTO.getPhone(),
+                loginDTO.getPassword(),
+                httpRes
+        );
+    }
     @Override
     public Optional<Car> getById(Integer id) {
         return Optional.empty();
