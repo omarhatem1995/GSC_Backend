@@ -100,8 +100,13 @@ public class AdminController {
     }
 
     @GetMapping("all_cars")
-    private ResponseEntity getAllCars(@RequestHeader("Authorization") String token) {
-        return adminService.getAllCarsForAdmin(token);
+    private ResponseEntity getAllCars(
+            @RequestHeader("Authorization") String token,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return adminService.getAllCarsForAdmin(token, search, userId, page, size);
     }
 
     @GetMapping("all_cars_by_user_id")

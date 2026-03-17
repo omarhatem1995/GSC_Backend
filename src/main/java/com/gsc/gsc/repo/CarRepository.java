@@ -35,6 +35,18 @@ public interface CarRepository extends JpaRepository<Car, Integer> {
             "FROM Car c LEFT JOIN Model m ON c.modelId = m.id WHERE c.userId=?1 AND c.isDeleted != true")
     List<CarDTO> findAllCarsWithModelInfoByUserId(Integer userId);
 
+    @Query("SELECT NEW com.gsc.gsc.car.dto.CarDTO(c.id, c.plateNumber, c.licenseNumber, c.color, " +
+            "c.coveredKilos, c.property, c.isPremium, c.creationYear, c.date, c.details, c.notes, c.isActivated, " +
+            "CASE WHEN c.isPremium = 1 THEN c.expirationDate ELSE '' END, c.userId, c.modelId, m.code, c.chassisNumber, m.brandId, c.createdBy) " +
+            "FROM Car c LEFT JOIN Model m ON c.modelId = m.id " +
+            "WHERE c.isDeleted != true " +
+            "AND (:userId IS NULL OR c.userId = :userId) " +
+            "AND (:search IS NULL OR c.chassisNumber LIKE %:search% OR c.plateNumber LIKE %:search% OR c.licenseNumber LIKE %:search%)")
+    Page<CarDTO> findAllCarsWithFilters(
+            @Param("userId") Integer userId,
+            @Param("search") String search,
+            Pageable pageable);
+
     Optional<Car> findCarByLicenseNumber(String licenseNumber);
     Optional<Car> findCarByChassisNumber(String chassisNumber);
 

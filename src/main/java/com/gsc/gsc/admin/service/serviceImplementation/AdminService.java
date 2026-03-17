@@ -189,24 +189,25 @@ public class AdminService implements IAdminService {
     }
 
 
-    public ResponseEntity getAllCarsForAdmin(String token) {
+    public ResponseEntity getAllCarsForAdmin(String token, String search, Integer filterUserId, int page, int size) {
         Integer userIdFromToken = getUserIdFromToken(token);
-        ReturnObject returnObject = new ReturnObject();
+        ReturnObjectPaging returnObject = new ReturnObjectPaging();
         if (userRepository.findUserById(userIdFromToken).getAccountTypeId() == ADMIN_TYPE) {
-            List<Car> carsList = carRepository.findAll();
-            List<UsersCarsDTO> usersCarsDTOS = new ArrayList<>();
-            for (int i = 0; i < carsList.size(); i++) {
-                UsersCarsDTO usersCarsDTO;
-                if (carsList.get(i).getModelId() != null)
-                    usersCarsDTO = new UsersCarsDTO(carsList.get(i), modelRepository.findById(carsList.get(i).getModelId()));
-                else
-                    usersCarsDTO = new UsersCarsDTO(carsList.get(i));
-                usersCarsDTO.setUserName(userRepository.findUserById(carsList.get(i).getUserId()).getName());
-                usersCarsDTOS.add(usersCarsDTO);
-            }
+            Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+            // Pass null for empty search string so the JPQL IS NULL check works correctly
+            String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+            Page<CarDTO> carsPage = carRepository.findAllCarsWithFilters(filterUserId, searchParam, pageable);
+            List<CarDTO> carsList = carsPage.getContent();
+            // Attach user name to each result
+            carsList.forEach(car -> {
+                User owner = userRepository.findUserById(car.getUserId());
+                if (owner != null) car.setUserName(owner.getName());
+            });
             returnObject.setMessage("Success");
-            returnObject.setData(usersCarsDTOS);
+            returnObject.setData(carsList);
             returnObject.setStatus(true);
+            returnObject.setTotalCount(carsPage.getTotalElements());
+            returnObject.setTotalPages(carsPage.getTotalPages());
         } else {
             returnObject.setMessage("This user is not Authorized");
             returnObject.setStatus(false);
