@@ -282,14 +282,17 @@ public class AdminService implements IAdminService {
                             NotificationMessage notificationMessage = new NotificationMessage();
                             if (user.getFirebaseToken() != null) {
                                 notificationMessage.setRecToken(user.getFirebaseToken());
+                                notificationMessage.setTitle(notificationDTO.getTitle());
                                 notificationMessage.setBody(notificationDTO.getBody());
-                                notificationMessage.setData(Map.of("Message : ", notificationDTO.getBody()));
-                                notificationMessage.setTitle(notificationDTO.getBody());
+                                notificationMessage.setData(Map.of("message", notificationDTO.getBody()));
                                 Notification notification = new Notification();
                                 notification.setUserId(user.getId());
                                 notification.setText(notificationDTO.getBody());
                                 notificationRepository.save(notification);
-                                firebaseMessagingService.sendNotification(notificationMessage);
+                                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                                if ("Failed".equals(result)) {
+                                    System.err.println("FCM failed for user " + user.getId() + " token: " + user.getFirebaseToken());
+                                }
                             }
                         }
                     }
@@ -300,14 +303,17 @@ public class AdminService implements IAdminService {
                         NotificationMessage notificationMessage = new NotificationMessage();
                         if (user.getFirebaseToken() != null) {
                             notificationMessage.setRecToken(user.getFirebaseToken());
+                            notificationMessage.setTitle(notificationDTO.getTitle());
                             notificationMessage.setBody(notificationDTO.getBody());
-                            notificationMessage.setData(Map.of("Message : ", notificationDTO.getBody()));
-                            notificationMessage.setTitle(notificationDTO.getBody());
+                            notificationMessage.setData(Map.of("message", notificationDTO.getBody()));
                             Notification notification = new Notification();
                             notification.setUserId(user.getId());
                             notification.setText(notificationDTO.getBody());
                             notificationRepository.save(notification);
-                            firebaseMessagingService.sendNotification(notificationMessage);
+                            String result = firebaseMessagingService.sendNotification(notificationMessage);
+                            if ("Failed".equals(result)) {
+                                System.err.println("FCM failed for user " + user.getId() + " token: " + user.getFirebaseToken());
+                            }
                         }
                     }
                 }

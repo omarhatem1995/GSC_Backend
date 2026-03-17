@@ -21,7 +21,7 @@ public class GscApplication {
     @Bean
     FirebaseMessaging firebaseMessaging() throws IOException {
         GoogleCredentials googleCredentials = GoogleCredentials
-                .fromStream(new ClassPathResource("firebase-service-account.json")
+                .fromStream(new ClassPathResource("gsc-qatar-firebase.json")
                         .getInputStream());
         FirebaseOptions firebaseOptions = FirebaseOptions.builder()
                 .setCredentials(googleCredentials).build();
