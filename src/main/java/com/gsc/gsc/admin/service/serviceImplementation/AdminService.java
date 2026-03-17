@@ -310,15 +310,18 @@ public class AdminService implements IAdminService {
                 notificationMessage.setTitle(notificationDTO.getTitle());
                 notificationMessage.setBody(notificationDTO.getBody());
                 notificationMessage.setData(Map.of("message", notificationDTO.getBody()));
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                boolean sent = !"Failed".equals(result);
                 Notification notification = new Notification();
                 notification.setUserId(user.getId());
+                notification.setTitle(notificationDTO.getTitle());
                 notification.setText(notificationDTO.getBody());
+                notification.setIsSent(sent);
                 notificationRepository.save(notification);
-                String result = firebaseMessagingService.sendNotification(notificationMessage);
-                if ("Failed".equals(result)) {
-                    System.err.println("[Notification] FAILED  | userId: " + user.getId() + " | name: " + user.getName());
-                } else {
+                if (sent) {
                     System.out.println("[Notification] SUCCESS | userId: " + user.getId() + " | name: " + user.getName() + " | msgId: " + result);
+                } else {
+                    System.err.println("[Notification] FAILED  | userId: " + user.getId() + " | name: " + user.getName());
                 }
             }
         }

@@ -28,6 +28,8 @@ public class Notification {
     @Basic
     @Column(name = "title")
     private String title;
+    @Column(name = "is_sent")
+    private Boolean isSent;
     @Column(name = "created_at")
     private String createdAt;
     @Column(name = "updated_at")
