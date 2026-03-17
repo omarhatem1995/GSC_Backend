@@ -42,9 +42,13 @@ public class CarController {
         return carService.getCarsByToken(token);
     }
     @GetMapping({"admin"})
-    public ResponseEntity<?> getCarsForAdminByToken(@RequestHeader("Authorization") String token,
-                                                    @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
-        return carService.getCarsForAdminByToken(token, page, size);
+    public ResponseEntity<?> getCarsForAdminByToken(
+            @RequestHeader("Authorization") String token,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer userId) {
+        return carService.getCarsForAdminByToken(token, page, size, search, userId);
     }
 
     @GetMapping({"admin/{id}"})

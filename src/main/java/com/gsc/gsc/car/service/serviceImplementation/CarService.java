@@ -333,23 +333,29 @@ public class CarService implements ICarService {
         }
         return ResponseEntity.ok(returnObject);
     }
-    public ResponseEntity<?> getCarsForAdminByToken(String token, @RequestParam(defaultValue = "0") int page,
-                                                    @RequestParam(defaultValue = "10") int size) {
+    public ResponseEntity<?> getCarsForAdminByToken(String token, int page, int size,
+                                                    String search, Integer filterUserId) {
         ReturnObjectPaging returnObject = new ReturnObjectPaging();
         Integer userId = userService.getUserIdFromToken(token);
         User user = userRepository.getById(userId);
         if (user.getAccountTypeId() == ADMIN_TYPE) {
-            Page<CarDTO> carPage = carRepository.findAllCarsWithModelInfo(PageRequest.of(page, size));
+            String searchParam = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+            Page<CarDTO> carPage = carRepository.findAllCarsWithFilters(filterUserId, searchParam, PageRequest.of(page, size));
             if (carPage.isEmpty()) {
                 returnObject.setMessage("No Cars Found");
                 returnObject.setStatus(false);
                 returnObject.setData(new ArrayList<>());
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
             } else {
+                List<CarDTO> cars = carPage.getContent();
+                cars.forEach(car -> {
+                    User owner = userRepository.findUserById(car.getUserId());
+                    if (owner != null) car.setUserName(owner.getName());
+                });
                 returnObject.setTotalPages(carPage.getTotalPages());
                 returnObject.setTotalCount(carPage.getTotalElements());
                 returnObject.setMessage("Cars Loaded Successfully");
-                returnObject.setData(carPage.getContent());
+                returnObject.setData(cars);
                 returnObject.setStatus(true);
                 return ResponseEntity.ok(returnObject);
             }
