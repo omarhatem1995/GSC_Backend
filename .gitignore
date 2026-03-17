@@ -31,3 +31,23 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Sensitive credentials ###
+src/main/resources/application.properties
+src/main/resources/firebase-service-account.json
+src/main/resources/gsc-qatar-firebase.json
+*.json.key
+
+### AI / IDE tool configs ###
+.continue/
+.jpb/
+
+### Compiled frontend build ###
+browser/
+browser.rar
+frontend/dist/
+frontend/node_modules/
+
+### Temp / artifact files ###
+output.pdf
+*.pdf

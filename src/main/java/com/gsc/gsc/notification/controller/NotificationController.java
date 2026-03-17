@@ -1,7 +1,7 @@
 package com.gsc.gsc.notification.controller;
 
 import com.gsc.gsc.models.service.serviceImplementation.ModelService;
-import com.gsc.gsc.notification.service.serviceImplemetation.NotificationService;
+import com.gsc.gsc.notification.service.serviceImplementation.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

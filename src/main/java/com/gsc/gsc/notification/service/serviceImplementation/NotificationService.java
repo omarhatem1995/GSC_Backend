@@ -1,4 +1,4 @@
-package com.gsc.gsc.notification.service.serviceImplemetation;
+package com.gsc.gsc.notification.service.serviceImplementation;
 
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.repo.*;
