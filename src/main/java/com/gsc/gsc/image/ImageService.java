@@ -1,7 +1,7 @@
 package com.gsc.gsc.image;
 
 import com.gsc.gsc.repo.UserRepository;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

@@ -4,7 +4,7 @@ import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.job_cards.service.serviceImplementation.JobCardService;
 import com.gsc.gsc.model.*;
 import com.gsc.gsc.repo.*;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import com.gsc.gsc.utilities.FontLoader;
 import com.itextpdf.io.font.PdfEncodings;
 import com.itextpdf.io.image.ImageData;

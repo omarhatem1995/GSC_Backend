@@ -1,4 +1,4 @@
-package com.gsc.gsc.email;
+package com.gsc.gsc.email.controller;
 
 import com.gsc.gsc.user.dto.UserDTO;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -2,7 +2,7 @@ package com.gsc.gsc.job_cards.service.serviceImplementation;
 
 import com.gsc.gsc.bill.dto.OtherProductDTO;
 import com.gsc.gsc.bill.dto.ProductBillDTO;
-import com.gsc.gsc.bill.service.serviceInterface.BillService;
+import com.gsc.gsc.bill.service.serviceImplementation.BillService;
 import com.gsc.gsc.brand.dto.BrandDTO;
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.constants.ReturnObjectPaging;
@@ -12,7 +12,7 @@ import com.gsc.gsc.job_cards.dto.JobCardNotesDTO;
 import com.gsc.gsc.job_cards.dto.JobCardsDTO;
 import com.gsc.gsc.model.*;
 import com.gsc.gsc.repo.*;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import com.gsc.gsc.utilities.FirebaseMessagingService;
 import com.gsc.gsc.utilities.ImgBBService;
 import com.gsc.gsc.utilities.NotificationMessage;

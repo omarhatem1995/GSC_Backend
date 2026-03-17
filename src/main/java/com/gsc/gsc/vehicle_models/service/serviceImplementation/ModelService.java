@@ -1,10 +1,10 @@
-package com.gsc.gsc.models.service.serviceImplementation;
+package com.gsc.gsc.vehicle_models.service.serviceImplementation;
 
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.model.*;
-import com.gsc.gsc.models.dto.AddModelDTO;
-import com.gsc.gsc.models.service.serviceInterface.IModelService;
+import com.gsc.gsc.vehicle_models.dto.AddModelDTO;
+import com.gsc.gsc.vehicle_models.service.serviceInterface.IModelService;
 import com.gsc.gsc.product.dto.ProductDTO;
 import com.gsc.gsc.repo.*;
 import org.springframework.beans.factory.annotation.Autowired;

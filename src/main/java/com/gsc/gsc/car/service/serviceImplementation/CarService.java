@@ -10,7 +10,7 @@ import com.gsc.gsc.model.User;
 import com.gsc.gsc.repo.CarRepository;
 import com.gsc.gsc.repo.ModelRepository;
 import com.gsc.gsc.repo.UserRepository;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

@@ -1,4 +1,4 @@
-package com.gsc.gsc.models.service.serviceInterface;
+package com.gsc.gsc.vehicle_models.service.serviceInterface;
 
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.model.Car;

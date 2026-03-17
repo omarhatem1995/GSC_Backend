@@ -5,7 +5,7 @@ import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.model.Car;
 import com.gsc.gsc.repo.BrandRepository;
 import com.gsc.gsc.repo.UserRepository;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;

@@ -17,7 +17,7 @@ import com.gsc.gsc.user.dto.GetAllUsers;
 import com.gsc.gsc.user.dto.LoginDTO;
 import com.gsc.gsc.user.security.AuthenticationService;
 import com.gsc.gsc.user.security.util.JwtUtil;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import com.gsc.gsc.utilities.FirebaseMessagingService;
 import com.gsc.gsc.utilities.NotificationMessage;
 import io.jsonwebtoken.Claims;
@@ -43,7 +43,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
-import static com.gsc.gsc.user.service.servicesImplementation.UserService.cleanMobileNumber;
+import static com.gsc.gsc.user.service.serviceImplementation.UserService.cleanMobileNumber;
 
 @Service
 public class AdminService implements IAdminService {

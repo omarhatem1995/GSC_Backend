@@ -1,4 +1,4 @@
-package com.gsc.gsc.configurations;
+package com.gsc.gsc.configurations.service;
 
 import com.gsc.gsc.configurations.dto.*;
 import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;
@@ -6,7 +6,7 @@ import com.gsc.gsc.configurations.dto.vehicle.VehicleModelDTO;
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.model.*;
 import com.gsc.gsc.repo.*;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import com.gsc.gsc.utilities.ImgBBService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;

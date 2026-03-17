@@ -1,4 +1,4 @@
-package com.gsc.gsc.configurations;
+package com.gsc.gsc.configurations.controller;
 
 import com.gsc.gsc.configurations.dto.CreateManufacturerDTO;
 import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;

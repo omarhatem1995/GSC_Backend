@@ -2,7 +2,7 @@ package com.gsc.gsc.notification.service.serviceImplementation;
 
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.repo.*;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -5,7 +5,7 @@ import com.gsc.gsc.admin.dto.NotificationDTO;
 import com.gsc.gsc.admin.service.serviceImplementation.AdminService;
 import com.gsc.gsc.bill.dto.AddBillDTO;
 import com.gsc.gsc.bill.dto.UpdateBillStatusDTO;
-import com.gsc.gsc.bill.service.serviceInterface.BillService;
+import com.gsc.gsc.bill.service.serviceImplementation.BillService;
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.car.service.serviceImplementation.CarService;
 import com.gsc.gsc.constants.ReturnObject;

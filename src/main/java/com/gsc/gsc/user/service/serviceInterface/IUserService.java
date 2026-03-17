@@ -1,4 +1,4 @@
-package com.gsc.gsc.user.service.servicesInterface;
+package com.gsc.gsc.user.service.serviceInterface;
 
 import com.gsc.gsc.model.User;
 import com.gsc.gsc.user.dto.UserCreateDTO;

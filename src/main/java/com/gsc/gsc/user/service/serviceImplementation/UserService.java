@@ -1,4 +1,4 @@
-package com.gsc.gsc.user.service.servicesImplementation;
+package com.gsc.gsc.user.service.serviceImplementation;
 
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.email.EmailService;
@@ -9,7 +9,7 @@ import com.gsc.gsc.repo.UserRepository;
 import com.gsc.gsc.user.dto.*;
 import com.gsc.gsc.user.security.AuthenticationService;
 import com.gsc.gsc.user.security.util.JwtUtil;
-import com.gsc.gsc.user.service.servicesInterface.IUserService;
+import com.gsc.gsc.user.service.serviceInterface.IUserService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;

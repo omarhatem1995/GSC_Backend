@@ -1,4 +1,4 @@
-package com.gsc.gsc.utilities;
+package com.gsc.gsc.fcm.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

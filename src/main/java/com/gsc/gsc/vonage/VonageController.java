@@ -2,7 +2,7 @@ package com.gsc.gsc.vonage;
 
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.user.dto.UserDTO;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import com.gsc.gsc.utilities.VonageConstants;
 import com.vonage.client.VonageClient;
 import com.vonage.client.verify.CheckResponse;

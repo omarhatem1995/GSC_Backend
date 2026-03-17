@@ -1,4 +1,4 @@
-package com.gsc.gsc.job_cards.pdf;
+package com.gsc.gsc.job_cards.controller;
 
 import com.gsc.gsc.constants.ReturnObject;
 import org.springframework.beans.factory.annotation.Autowired;

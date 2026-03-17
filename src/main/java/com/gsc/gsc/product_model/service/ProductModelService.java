@@ -2,7 +2,7 @@ package com.gsc.gsc.product_model.service;
 
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.model.Car;
-import com.gsc.gsc.models.service.serviceInterface.IModelService;
+import com.gsc.gsc.vehicle_models.service.serviceInterface.IModelService;
 import com.gsc.gsc.product.dto.ProductDTO;
 import com.gsc.gsc.repo.ModelRepository;
 import com.gsc.gsc.repo.ProductModelRepository;

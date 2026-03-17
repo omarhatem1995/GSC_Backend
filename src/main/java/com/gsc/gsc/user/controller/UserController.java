@@ -4,7 +4,7 @@ import com.gsc.gsc.model.FirebaseToken;
 import com.gsc.gsc.user.dto.LoginDTO;
 import com.gsc.gsc.user.dto.UserDTO;
 import com.gsc.gsc.user.security.util.JwtUtil;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

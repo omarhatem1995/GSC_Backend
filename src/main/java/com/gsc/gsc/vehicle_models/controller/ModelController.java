@@ -1,7 +1,7 @@
-package com.gsc.gsc.models.controller;
+package com.gsc.gsc.vehicle_models.controller;
 
-import com.gsc.gsc.models.dto.AddModelDTO;
-import com.gsc.gsc.models.service.serviceImplementation.ModelService;
+import com.gsc.gsc.vehicle_models.dto.AddModelDTO;
+import com.gsc.gsc.vehicle_models.service.serviceImplementation.ModelService;
 import com.gsc.gsc.product.dto.ProductDTO;
 import com.gsc.gsc.product.service.serviceImplementation.ProductService;
 import org.springframework.beans.factory.annotation.Autowired;

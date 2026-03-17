@@ -1,4 +1,4 @@
-package com.gsc.gsc.models.dto;
+package com.gsc.gsc.vehicle_models.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

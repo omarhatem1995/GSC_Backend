@@ -2,7 +2,7 @@ package com.gsc.gsc.bill.controller;
 
 import com.gsc.gsc.bill.dto.AddBillDTO;
 import com.gsc.gsc.bill.pdf.BillPdfGeneratorITextService;
-import com.gsc.gsc.bill.service.serviceInterface.BillService;
+import com.gsc.gsc.bill.service.serviceImplementation.BillService;
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.job_cards.dto.AddJobCardNotes;
 import org.springframework.beans.factory.annotation.Autowired;

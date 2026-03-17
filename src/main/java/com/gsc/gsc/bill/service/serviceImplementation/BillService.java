@@ -1,4 +1,4 @@
-package com.gsc.gsc.bill.service.serviceInterface;
+package com.gsc.gsc.bill.service.serviceImplementation;
 
 import com.gsc.gsc.bill.dto.*;
 import com.gsc.gsc.car.dto.CarDTO;
@@ -9,7 +9,7 @@ import com.gsc.gsc.model.*;
 import com.gsc.gsc.model.view.ProductDetailsView;
 import com.gsc.gsc.product.dto.ProductDTO;
 import com.gsc.gsc.repo.*;
-import com.gsc.gsc.user.service.servicesImplementation.UserService;
+import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
