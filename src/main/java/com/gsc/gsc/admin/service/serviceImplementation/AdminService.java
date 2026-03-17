@@ -265,75 +265,66 @@ public class AdminService implements IAdminService {
 
     public ResponseEntity<?> sendNotificationByAdmin(String token, NotificationDTO notificationDTO) {
         Integer userId = userService.getUserIdFromToken(token);
-        User userAdmin = userRepository.findUserById(userId);
         ReturnObject returnObject = new ReturnObject();
-        if (userId != null) {
-            if (userAdmin.getAccountTypeId() == ADMIN_TYPE) {
-                if (notificationDTO.getUserIds().isEmpty()) {
-                    returnObject.setMessage("No Users Selected");
-                    returnObject.setData(null);
-                    returnObject.setStatus(false);
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-                } else if (notificationDTO.getUserIds().get(0) != 0) {
-                    for (int i = 0; i < notificationDTO.getUserIds().size(); i++) {
-                        Optional<User> userOptional = userRepository.findById(notificationDTO.getUserIds().get(i));
-                        if (userOptional.isPresent()) {
-                            User user = userOptional.get();
-                            NotificationMessage notificationMessage = new NotificationMessage();
-                            if (user.getFirebaseToken() != null) {
-                                notificationMessage.setRecToken(user.getFirebaseToken());
-                                notificationMessage.setTitle(notificationDTO.getTitle());
-                                notificationMessage.setBody(notificationDTO.getBody());
-                                notificationMessage.setData(Map.of("message", notificationDTO.getBody()));
-                                Notification notification = new Notification();
-                                notification.setUserId(user.getId());
-                                notification.setText(notificationDTO.getBody());
-                                notificationRepository.save(notification);
-                                String result = firebaseMessagingService.sendNotification(notificationMessage);
-                                if ("Failed".equals(result)) {
-                                    System.err.println("FCM failed for user " + user.getId() + " token: " + user.getFirebaseToken());
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    List<User> usersList = userRepository.findAll();
-                    for (int i = 0; i < usersList.size(); i++) {
-                        User user = usersList.get(i);
-                        NotificationMessage notificationMessage = new NotificationMessage();
-                        if (user.getFirebaseToken() != null) {
-                            notificationMessage.setRecToken(user.getFirebaseToken());
-                            notificationMessage.setTitle(notificationDTO.getTitle());
-                            notificationMessage.setBody(notificationDTO.getBody());
-                            notificationMessage.setData(Map.of("message", notificationDTO.getBody()));
-                            Notification notification = new Notification();
-                            notification.setUserId(user.getId());
-                            notification.setText(notificationDTO.getBody());
-                            notificationRepository.save(notification);
-                            String result = firebaseMessagingService.sendNotification(notificationMessage);
-                            if ("Failed".equals(result)) {
-                                System.err.println("FCM failed for user " + user.getId() + " token: " + user.getFirebaseToken());
-                            }
-                        }
-                    }
-                }
-                returnObject.setMessage("Success");
-                returnObject.setStatus(true);
-                returnObject.setData(null);
-                return ResponseEntity.ok(returnObject);
-            } else {
-                returnObject.setMessage("Not Authorized to send Notification");
-                returnObject.setStatus(false);
-                returnObject.setData(null);
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
-            }
 
-        } else {
+        if (userId == null) {
             returnObject.setMessage("Not Authorized to send Notification");
             returnObject.setStatus(false);
             returnObject.setData(null);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
+
+        User userAdmin = userRepository.findUserById(userId);
+        if (userAdmin.getAccountTypeId() != ADMIN_TYPE) {
+            returnObject.setMessage("Not Authorized to send Notification");
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        // Build target user list based on targetType
+        List<User> targetUsers = new ArrayList<>();
+        if ("ALL".equals(notificationDTO.getTargetType())) {
+            // Send to all non-admin users (exclude accountTypeId = ADMIN_TYPE)
+            targetUsers = userRepository.findAll().stream()
+                    .filter(u -> u.getAccountTypeId() != ADMIN_TYPE)
+                    .collect(Collectors.toList());
+        } else {
+            // Send to specific users by ID
+            if (notificationDTO.getUserIds() == null || notificationDTO.getUserIds().isEmpty()) {
+                returnObject.setMessage("No Users Selected");
+                returnObject.setData(null);
+                returnObject.setStatus(false);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+            }
+            for (Integer targetId : notificationDTO.getUserIds()) {
+                userRepository.findById(targetId).ifPresent(targetUsers::add);
+            }
+        }
+
+        // Send notification to each target user
+        for (User user : targetUsers) {
+            if (user.getFirebaseToken() != null) {
+                NotificationMessage notificationMessage = new NotificationMessage();
+                notificationMessage.setRecToken(user.getFirebaseToken());
+                notificationMessage.setTitle(notificationDTO.getTitle());
+                notificationMessage.setBody(notificationDTO.getBody());
+                notificationMessage.setData(Map.of("message", notificationDTO.getBody()));
+                Notification notification = new Notification();
+                notification.setUserId(user.getId());
+                notification.setText(notificationDTO.getBody());
+                notificationRepository.save(notification);
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                if ("Failed".equals(result)) {
+                    System.err.println("FCM failed for user " + user.getId() + " token: " + user.getFirebaseToken());
+                }
+            }
+        }
+
+        returnObject.setMessage("Success");
+        returnObject.setStatus(true);
+        returnObject.setData(null);
+        return ResponseEntity.ok(returnObject);
     }
 
     private void activateCar(Integer carId, Byte isActivated) {

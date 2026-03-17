@@ -9,4 +9,5 @@ public class NotificationDTO {
     List<Integer> userIds;
     String title;
     String body;
+    String targetType;
 }
