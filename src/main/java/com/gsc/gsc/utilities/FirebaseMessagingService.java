@@ -26,10 +26,11 @@ public class FirebaseMessagingService {
                 .build();
 
         try{
-            firebaseMessaging.send(message);
-            return "Success";
-        }catch (FirebaseMessagingException firebaseMessagingException){
-            firebaseMessagingException.printStackTrace();
+            String messageId = firebaseMessaging.send(message);
+            System.out.println("[FCM] Sent successfully | messageId: " + messageId + " | token: " + notificationMessage.getRecToken());
+            return messageId;
+        }catch (FirebaseMessagingException e){
+            System.err.println("[FCM] Send failed | token: " + notificationMessage.getRecToken() + " | error: " + e.getMessagingErrorCode() + " - " + e.getMessage());
             return "Failed";
         }
     }

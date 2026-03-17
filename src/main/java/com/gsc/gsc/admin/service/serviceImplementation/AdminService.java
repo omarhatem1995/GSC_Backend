@@ -316,7 +316,9 @@ public class AdminService implements IAdminService {
                 notificationRepository.save(notification);
                 String result = firebaseMessagingService.sendNotification(notificationMessage);
                 if ("Failed".equals(result)) {
-                    System.err.println("FCM failed for user " + user.getId() + " token: " + user.getFirebaseToken());
+                    System.err.println("[Notification] FAILED  | userId: " + user.getId() + " | name: " + user.getName());
+                } else {
+                    System.out.println("[Notification] SUCCESS | userId: " + user.getId() + " | name: " + user.getName() + " | msgId: " + result);
                 }
             }
         }
