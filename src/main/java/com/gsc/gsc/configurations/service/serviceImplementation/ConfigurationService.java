@@ -3,12 +3,18 @@ package com.gsc.gsc.configurations.service.serviceImplementation;
 import com.gsc.gsc.configurations.dto.*;
 import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;
 import com.gsc.gsc.configurations.dto.vehicle.VehicleModelDTO;
+import com.gsc.gsc.configurations.dto.vehicle.VehicleTableDTO;
 import com.gsc.gsc.constants.ReturnObject;
+import com.gsc.gsc.constants.ReturnObjectPaging;
 import com.gsc.gsc.model.*;
 import com.gsc.gsc.repo.*;
 import com.gsc.gsc.user.service.serviceImplementation.UserService;
 import com.gsc.gsc.utilities.ImgBBService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -101,6 +107,32 @@ public class ConfigurationService {
         returnObject.setData(brands);
         returnObject.setStatus(true);
 
+        return ResponseEntity.ok(returnObject);
+    }
+
+    public ResponseEntity<?> getVehiclesTable(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+        Page<Brand> brandPage = brandRepository.findAll(pageable);
+
+        List<VehicleTableDTO> rows = brandPage.getContent().stream()
+                .map(brand -> new VehicleTableDTO(
+                        brand.getId(),
+                        brand.getCode(),
+                        brand.getNameEn(),
+                        brand.getNameAr(),
+                        brand.getImageUrl(),
+                        modelRepository.countByBrandId(brand.getId()),
+                        brand.getCreatedAt(),
+                        brand.getUpdatedAt()
+                ))
+                .collect(Collectors.toList());
+
+        ReturnObjectPaging returnObject = new ReturnObjectPaging();
+        returnObject.setMessage("Loaded Successfully");
+        returnObject.setStatus(true);
+        returnObject.setData(rows);
+        returnObject.setTotalPages(brandPage.getTotalPages());
+        returnObject.setTotalCount(brandPage.getTotalElements());
         return ResponseEntity.ok(returnObject);
     }
 

@@ -21,6 +21,13 @@ public class VehiclesController {
     @Autowired
     ConfigurationService configurationService;
 
+    @GetMapping("")
+    public ResponseEntity getVehicles(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return configurationService.getVehiclesTable(page, size);
+    }
+
     @PostMapping("")
     public ResponseEntity addVehicles(@RequestHeader (value = "Authorization") String token,
                                            @RequestBody CreateVehicleDTO createVehicleDTO){

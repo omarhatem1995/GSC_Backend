@@ -19,4 +19,5 @@ public interface ModelRepository extends JpaRepository<Model, Integer> {
     List<Model> findModelsByBrandId(Integer integers);
     boolean existsByBrandIdAndCodeAndCreationYear(Integer brandId, String code, Integer creationYear);
     List<Model> findAllById(Integer integers);
+    long countByBrandId(Integer brandId);
 }
