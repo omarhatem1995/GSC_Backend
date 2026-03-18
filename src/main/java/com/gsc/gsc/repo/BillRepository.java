@@ -49,6 +49,7 @@ public interface BillRepository extends JpaRepository<Bill, Integer> {
                     "LEFT JOIN BillType bt ON b.billTypeId = bt.id " +
                     "LEFT JOIN CBillStatus bs ON b.statusId = bs.id " +
                     "WHERE (:userId IS NULL OR b.userId = :userId) " +
+                    "AND (:carId IS NULL OR b.carId = :carId) " +
                     "AND (:search IS NULL OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%'))) " +
                     "AND (:billNumber IS NULL OR b.referenceNumber LIKE CONCAT('%', :billNumber, '%')) " +
                     "AND (:fromDate IS NULL OR b.createdAt >= :fromDate) " +
@@ -57,6 +58,7 @@ public interface BillRepository extends JpaRepository<Bill, Integer> {
     )
     Page<GetBillsDTO> findByFilters(
             @Param("userId") Integer userId,
+            @Param("carId") Integer carId,
             @Param("search") String search,
             @Param("billNumber") String billNumber,
             @Param("fromDate") Timestamp fromDate,

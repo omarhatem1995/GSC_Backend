@@ -2,6 +2,7 @@ package com.gsc.gsc.configurations.service.serviceImplementation;
 
 import com.gsc.gsc.configurations.dto.*;
 import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;
+import com.gsc.gsc.configurations.dto.vehicle.UpdateVehicleDTO;
 import com.gsc.gsc.configurations.dto.vehicle.VehicleModelDTO;
 import com.gsc.gsc.configurations.dto.vehicle.VehicleTableDTO;
 import com.gsc.gsc.constants.ReturnObject;
@@ -46,6 +47,57 @@ public class ConfigurationService {
     private UserRepository userRepository;
     @Autowired
     private ImgBBService imgBBService;
+    public ResponseEntity<?> getVehicleById(Integer brandId) {
+        ReturnObject returnObject = new ReturnObject();
+
+        Optional<Brand> brandOptional = brandRepository.findById(brandId);
+        if (!brandOptional.isPresent()) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Brand not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
+        }
+
+        Brand brand = brandOptional.get();
+        List<Model> modelEntities = modelRepository.findModelsByBrandId(brandId);
+
+        // Group by code so each model entry carries all its years + colors
+        Map<String, CModelDTO> modelMap = new LinkedHashMap<>();
+        for (Model m : modelEntities) {
+            String code = m.getCode();
+            if (!modelMap.containsKey(code)) {
+                CModelDTO dto = new CModelDTO();
+                dto.setId(m.getId());
+                dto.setCode(code);
+                dto.setYears(new ArrayList<>());
+                List<Color> colors = colorRepository.findColorsByModelId(m.getId());
+                dto.setColors(colors.stream()
+                        .map(c -> new CColorDTO(c.getId(), c.getName()))
+                        .collect(Collectors.toList()));
+                modelMap.put(code, dto);
+            }
+            if (m.getCreationYear() != null) {
+                modelMap.get(code).getYears().add(m.getCreationYear());
+            }
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id",            brand.getId());
+        data.put("code",          brand.getCode());
+        data.put("nameEn",        brand.getNameEn());
+        data.put("nameAr",        brand.getNameAr());
+        data.put("descriptionEn", brand.getDescriptionEn());
+        data.put("descriptionAr", brand.getDescriptionAr());
+        data.put("imageUrl",      brand.getImageUrl());
+        data.put("createdAt",     brand.getCreatedAt());
+        data.put("updatedAt",     brand.getUpdatedAt());
+        data.put("models",        new ArrayList<>(modelMap.values()));
+
+        returnObject.setStatus(true);
+        returnObject.setMessage("Loaded Successfully");
+        returnObject.setData(data);
+        return ResponseEntity.ok(returnObject);
+    }
+
     public ResponseEntity findAllModels() {
         ReturnObject returnObject = new ReturnObject();
         returnObject.setMessage("Loaded Successfully");
@@ -247,5 +299,75 @@ public class ConfigurationService {
             returnObject.setData(createVehicleDTO);
             return  ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
+    }
+
+    public ResponseEntity<?> updateVehicle(String token, Integer brandId, UpdateVehicleDTO dto) {
+        ReturnObject returnObject = new ReturnObject();
+        Integer userId = userService.getUserIdFromToken(token);
+        User user = userRepository.findUserById(userId);
+
+        if (user == null) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("User not found");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        if (user.getAccountTypeId() != ADMIN_TYPE) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("User is not an admin");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        Optional<Brand> brandOptional = brandRepository.findById(brandId);
+        if (!brandOptional.isPresent()) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Brand not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
+        }
+
+        Brand brand = brandOptional.get();
+
+        // Partial update — only overwrite fields that are actually sent
+        if (dto.getNameEn()        != null) brand.setNameEn(dto.getNameEn());
+        if (dto.getNameAr()        != null) brand.setNameAr(dto.getNameAr());
+        if (dto.getDescriptionEn() != null) brand.setDescriptionEn(dto.getDescriptionEn());
+        if (dto.getDescriptionAr() != null) brand.setDescriptionAr(dto.getDescriptionAr());
+        if (dto.getImageUrl()      != null) brand.setImageUrl(dto.getImageUrl());
+
+        brandRepository.save(brand);
+
+        // Upsert models if provided
+        if (dto.getVehicleModelList() != null) {
+            for (VehicleModelDTO vehicleModelDTO : dto.getVehicleModelList()) {
+                if (vehicleModelDTO.getYears() == null) continue;
+                for (String yearStr : vehicleModelDTO.getYears()) {
+                    Integer year = Integer.valueOf(yearStr);
+                    Optional<Model> existingModel = modelRepository
+                            .findByBrandIdAndCodeAndCreationYear(brandId, vehicleModelDTO.getCode(), year);
+
+                    if (existingModel.isPresent()) {
+                        // Update names on existing entry
+                        Model model = existingModel.get();
+                        if (vehicleModelDTO.getNameEn() != null) model.setNameEn(vehicleModelDTO.getNameEn());
+                        if (vehicleModelDTO.getNameAr() != null) model.setNameAr(vehicleModelDTO.getNameAr());
+                        modelRepository.save(model);
+                    } else {
+                        // New model/year combo — create it
+                        Model model = new Model();
+                        model.setBrandId(brandId);
+                        model.setCode(vehicleModelDTO.getCode());
+                        model.setNameEn(vehicleModelDTO.getNameEn());
+                        model.setNameAr(vehicleModelDTO.getNameAr());
+                        model.setCreationYear(year);
+                        modelRepository.save(model);
+                    }
+                }
+            }
+        }
+
+        returnObject.setStatus(true);
+        returnObject.setMessage("Updated Successfully");
+        returnObject.setData(brand);
+        return ResponseEntity.ok(returnObject);
     }
 }

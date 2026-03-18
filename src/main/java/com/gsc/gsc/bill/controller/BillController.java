@@ -110,6 +110,7 @@ public class BillController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) Integer carId,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String billNumber,
             @RequestParam(required = false) String fromDate,
@@ -121,6 +122,7 @@ public class BillController {
         return billService.getBills(
                 token,
                 userId,
+                carId,
                 search,
                 billNumber,
                 fromDate,

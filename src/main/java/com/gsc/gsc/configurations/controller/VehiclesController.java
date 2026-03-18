@@ -2,6 +2,7 @@ package com.gsc.gsc.configurations.controller;
 
 import com.gsc.gsc.configurations.dto.CreateManufacturerDTO;
 import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;
+import com.gsc.gsc.configurations.dto.vehicle.UpdateVehicleDTO;
 import com.gsc.gsc.configurations.service.serviceImplementation.ConfigurationService;
 import com.gsc.gsc.model.PagingClass;
 import com.gsc.gsc.product.dto.ManufacturerRequest;
@@ -28,9 +29,21 @@ public class VehiclesController {
         return configurationService.getVehiclesTable(page, size);
     }
 
+    @GetMapping("/{brandId}")
+    public ResponseEntity<?> getVehicleById(@PathVariable Integer brandId) {
+        return configurationService.getVehicleById(brandId);
+    }
+
     @PostMapping("")
-    public ResponseEntity addVehicles(@RequestHeader (value = "Authorization") String token,
-                                           @RequestBody CreateVehicleDTO createVehicleDTO){
-        return configurationService.addVehicles(token,createVehicleDTO);
+    public ResponseEntity addVehicles(@RequestHeader(value = "Authorization") String token,
+                                      @RequestBody CreateVehicleDTO createVehicleDTO) {
+        return configurationService.addVehicles(token, createVehicleDTO);
+    }
+
+    @PutMapping("/{brandId}")
+    public ResponseEntity<?> updateVehicle(@RequestHeader(value = "Authorization") String token,
+                                           @PathVariable Integer brandId,
+                                           @RequestBody UpdateVehicleDTO updateVehicleDTO) {
+        return configurationService.updateVehicle(token, brandId, updateVehicleDTO);
     }
 }

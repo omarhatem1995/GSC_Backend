@@ -138,6 +138,7 @@ public class BillService implements IBillService {
     public ResponseEntity<?> getBills(
             String token,
             Integer selectedUserId,
+            Integer carId,
             String search,
             String billNumber,
             String fromDate,
@@ -174,6 +175,7 @@ public class BillService implements IBillService {
 
                 billsPage = billRepository.findByFilters(
                         selectedUserId,
+                        carId,
                         search,
                         billNumber,
                         fromTimestamp,
@@ -185,6 +187,7 @@ public class BillService implements IBillService {
 
                 billsPage = billRepository.findByFilters(
                         null,
+                        carId,
                         search,
                         billNumber,
                         fromTimestamp,
@@ -197,6 +200,7 @@ public class BillService implements IBillService {
 
             billsPage = billRepository.findByFilters(
                     userIdFromToken,
+                    carId,
                     search,
                     billNumber,
                     fromTimestamp,
