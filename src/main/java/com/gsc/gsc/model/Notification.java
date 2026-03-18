@@ -30,6 +30,9 @@ public class Notification {
     private String title;
     @Column(name = "is_sent")
     private Boolean isSent;
+    @Basic
+    @Column(name = "notification_type")
+    private String notificationType;
     @Column(name = "created_at")
     private String createdAt;
     @Column(name = "updated_at")

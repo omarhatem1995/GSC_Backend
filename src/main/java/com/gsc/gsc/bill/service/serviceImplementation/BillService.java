@@ -29,8 +29,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.gsc.gsc.constants.NotificationTypes;
+import com.gsc.gsc.utilities.FirebaseMessagingService;
+import com.gsc.gsc.utilities.NotificationMessage;
+
+import java.util.Map;
+
 import static com.gsc.gsc.bill.BillConstants.NOT_PAID;
 import static com.gsc.gsc.bill.BillConstants.PAID;
+import static com.gsc.gsc.constants.NotificationTypes.BILL;
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 import static com.gsc.gsc.constants.UserTypes.USER_TYPE;
 
@@ -74,6 +81,10 @@ public class BillService implements IBillService {
     private ProductImagesRepository productImagesRepository;
     @Autowired
     private BillNotesRepository billNotesRepository;
+    @Autowired
+    private NotificationRepository notificationRepository;
+    @Autowired
+    private FirebaseMessagingService firebaseMessagingService;
 
     @Override
     public Optional<Car> getById(Integer id) {
@@ -451,6 +462,9 @@ public class BillService implements IBillService {
                 }
             }
 
+            // Notify the customer about the new bill
+            notifyUserForNewBill(bill);
+
             returnObject.setData(bill);
             returnObject.setStatus(true);
             returnObject.setMessage("Created Successfully!");
@@ -463,12 +477,36 @@ public class BillService implements IBillService {
         }
     }
 
+    private void notifyUserForNewBill(Bill bill) {
+        Optional<User> userOptional = userRepository.findById(bill.getUserId());
+        if (userOptional.isPresent()) {
+            User customer = userOptional.get();
+            String title = "New Bill : " + bill.getReferenceNumber();
+            String body  = "A new bill has been created for you with reference: " + bill.getReferenceNumber();
+            if (customer.getFirebaseToken() != null) {
+                NotificationMessage notificationMessage = new NotificationMessage();
+                notificationMessage.setTitle(title);
+                notificationMessage.setBody(body);
+                notificationMessage.setData(Map.of("message", body));
+                notificationMessage.setRecToken(customer.getFirebaseToken());
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                Notification notification = new Notification();
+                notification.setUserId(customer.getId());
+                notification.setTitle(title);
+                notification.setText(body);
+                notification.setIsSent(!"Failed".equals(result));
+                notification.setNotificationType(BILL);
+                notificationRepository.save(notification);
+            }
+        }
+    }
+
     public boolean checkExistingInvoice(JobCard jobCard) {
         List<Bill> billFound = billRepository.findAllByReferenceNumber("Inv" + jobCard.getCode());
         return !billFound.isEmpty();
     }
 
-    public void createJobCardBill(Integer userId, JobCard jobCard) {
+    public void createJobCardBill(Integer userId, JobCard jobCard, String adminName) {
         Bill bill = new Bill();
         bill.setReferenceNumber("Inv" + jobCard.getCode());
         bill.setStatusId(NOT_PAID);
@@ -499,6 +537,31 @@ public class BillService implements IBillService {
                 billProducts.add(billProduct);
             }
             billProductRepository.saveAll(billProducts);
+        }
+        notifyCustomerForJobCardBill(userId, jobCard.getCode(), adminName);
+    }
+
+    private void notifyCustomerForJobCardBill(Integer userId, String jobCardCode, String adminName) {
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            String title = "New Bill Created : " + jobCardCode;
+            String body  = "A new Job Card bill has been created for you by " + adminName;
+            if (user.getFirebaseToken() != null) {
+                NotificationMessage notificationMessage = new NotificationMessage();
+                notificationMessage.setTitle(title);
+                notificationMessage.setBody(body);
+                notificationMessage.setData(Map.of("message", body));
+                notificationMessage.setRecToken(user.getFirebaseToken());
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                Notification notification = new Notification();
+                notification.setUserId(user.getId());
+                notification.setTitle(title);
+                notification.setText(body);
+                notification.setIsSent(!"Failed".equals(result));
+                notification.setNotificationType(NotificationTypes.BILL);
+                notificationRepository.save(notification);
+            }
         }
     }
 
@@ -600,11 +663,43 @@ public class BillService implements IBillService {
 
         billRepository.save(bill);
 
+        notifyCustomerForBillPayment(bill, totalPaid, billTotal);
+
         returnObject.setData(bill);
         returnObject.setStatus(true);
         returnObject.setMessage("Updated Successfully");
 
         return ResponseEntity.ok(returnObject);
+    }
+
+    private void notifyCustomerForBillPayment(Bill bill, double totalPaid, double billTotal) {
+        Optional<User> userOptional = userRepository.findById(bill.getUserId());
+        if (userOptional.isPresent()) {
+            User customer = userOptional.get();
+            String title = "Payment Received : " + bill.getReferenceNumber();
+            String body;
+            if (totalPaid >= billTotal) {
+                body = "Your bill " + bill.getReferenceNumber() + " has been fully paid.";
+            } else {
+                body = "A payment has been made on your bill " + bill.getReferenceNumber()
+                        + ". Paid: " + totalPaid + " / " + billTotal + ".";
+            }
+            if (customer.getFirebaseToken() != null) {
+                NotificationMessage notificationMessage = new NotificationMessage();
+                notificationMessage.setTitle(title);
+                notificationMessage.setBody(body);
+                notificationMessage.setData(Map.of("message", body));
+                notificationMessage.setRecToken(customer.getFirebaseToken());
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                Notification notification = new Notification();
+                notification.setUserId(customer.getId());
+                notification.setTitle(title);
+                notification.setText(body);
+                notification.setIsSent(!"Failed".equals(result));
+                notification.setNotificationType(NotificationTypes.BILL);
+                notificationRepository.save(notification);
+            }
+        }
     }
 
     public Payment addPayment(String token, Integer billId, Double amount, String paymentType) {

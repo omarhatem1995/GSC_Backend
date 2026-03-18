@@ -42,6 +42,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.gsc.gsc.constants.NotificationTypes.ADMIN;
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 import static com.gsc.gsc.user.service.serviceImplementation.UserService.cleanMobileNumber;
 
@@ -318,6 +319,7 @@ public class AdminService implements IAdminService {
                 notification.setTitle(notificationDTO.getTitle());
                 notification.setText(notificationDTO.getBody());
                 notification.setIsSent(sent);
+                notification.setNotificationType(ADMIN);
                 notificationRepository.save(notification);
                 if (sent) {
                     System.out.println("[Notification] SUCCESS | userId: " + user.getId() + " | name: " + user.getName() + " | msgId: " + result);

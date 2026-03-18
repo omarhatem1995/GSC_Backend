@@ -34,6 +34,7 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.gsc.gsc.constants.NotificationTypes.JOB_CARD;
 import static com.gsc.gsc.constants.UserTypes.*;
 import static com.gsc.gsc.job_cards.JobCardConstants.*;
 
@@ -69,6 +70,8 @@ public class JobCardService {
     private BillService billService;
     @Autowired
     private ImgBBService imgBBService;
+    @Autowired
+    private NotificationRepository notificationRepository;
 
     public JobCardService(ModelMapper modelMapper) {
         this.modelMapper = modelMapper;
@@ -890,7 +893,7 @@ public class JobCardService {
                         existingJobCard.setJobCardStatusId(COMPLETED); //Completed
                         //Create Invoice
                         if (!billService.checkExistingInvoice(existingJobCard)) {
-                            billService.createJobCardBill(jobCardsDTO.getUserId(), existingJobCard);
+                            billService.createJobCardBill(jobCardsDTO.getUserId(), existingJobCard, userAdmin.getName());
                         } else {
                             returnObject.setMessage("Invoice Already Created");
                             returnObject.setStatus(false);
@@ -942,17 +945,7 @@ public class JobCardService {
                             jobCardProductRepository.save(jobCardProduct);
                         }
                     }
-                    Optional<User> userOptional = userRepository.findById(existingJobCard.getUserId());
-                    if (userOptional.isPresent()) {
-                        User user = userOptional.get();
-                        NotificationMessage notificationMessage = new NotificationMessage();
-                        notificationMessage.setTitle("Updated Job Card : " + existingJobCard.getCode());
-                        notificationMessage.setBody("You Job Card Has been updated by admin with Price:" + existingJobCard.getPrice());
-                        notificationMessage.setData(Map.of("Message : ", notificationMessage.getBody()));
-                        notificationMessage.setRecToken(user.getFirebaseToken());
-                        System.out.println("Notification Sent to : " + user.getId() + " , token : " + user.getFirebaseToken());
-                        firebaseMessagingService.sendNotification(notificationMessage);
-                    }
+                    notifyUserForJobCardUpdate(existingJobCard);
                     if (jobCardsDTO.getCustomerNotes() != null) {
                         if (!jobCardsDTO.getCustomerNotes().trim().isEmpty()) {
                             JobCardNotes jobCardNotes = new JobCardNotes();
@@ -1011,7 +1004,7 @@ public class JobCardService {
                     existingJobCard.setJobCardStatusId(COMPLETED); //Completed
                     //Create Invoice
                     if (!billService.checkExistingInvoice(existingJobCard)) {
-                        billService.createJobCardBill(existingJobCard.getUserId(), existingJobCard);
+                        billService.createJobCardBill(existingJobCard.getUserId(), existingJobCard, userAdmin.getName());
                     } else {
                         returnObject.setMessage("Invoice Already Created");
                         returnObject.setStatus(false);
@@ -1020,17 +1013,7 @@ public class JobCardService {
                     jobCardRepository.save(existingJobCard);
 
 
-                    Optional<User> userOptional = userRepository.findById(existingJobCard.getUserId());
-                    if (userOptional.isPresent()) {
-                        User user = userOptional.get();
-                        NotificationMessage notificationMessage = new NotificationMessage();
-                        notificationMessage.setTitle("Updated Job Card : " + existingJobCard.getCode());
-                        notificationMessage.setBody("You Job Card Has been updated by admin with Price:" + existingJobCard.getPrice());
-                        notificationMessage.setData(Map.of("Message : ", notificationMessage.getBody()));
-                        notificationMessage.setRecToken(user.getFirebaseToken());
-                        System.out.println("Notification Sent to : " + user.getId() + " , token : " + user.getFirebaseToken());
-                        firebaseMessagingService.sendNotification(notificationMessage);
-                    }
+                    notifyUserForJobCardUpdate(existingJobCard);
                     returnObject.setMessage("Job Card Updated Successfully");
                     returnObject.setData(existingJobCard);
                     returnObject.setStatus(true);
@@ -1215,13 +1198,26 @@ public class JobCardService {
         Optional<User> userOptional = userRepository.findById(existingJobCard.getUserId());
         if (userOptional.isPresent()) {
             User user = userOptional.get();
-            NotificationMessage notificationMessage = new NotificationMessage();
-            notificationMessage.setTitle("Updated Job Card : " + existingJobCard.getCode());
-            notificationMessage.setBody("You Job Card Has been updated by admin with Price:" + existingJobCard.getPrice());
-            notificationMessage.setData(Map.of("Message : ", notificationMessage.getBody()));
-            notificationMessage.setRecToken(user.getFirebaseToken());
-            System.out.println("Notification Sent to : " + user.getId() + " , token : " + user.getFirebaseToken());
-            firebaseMessagingService.sendNotification(notificationMessage);
+            String title = "Updated Job Card : " + existingJobCard.getCode();
+            String body  = "Your Job Card has been updated by admin with price: " + existingJobCard.getPrice();
+
+            if (user.getFirebaseToken() != null) {
+                NotificationMessage notificationMessage = new NotificationMessage();
+                notificationMessage.setTitle(title);
+                notificationMessage.setBody(body);
+                notificationMessage.setData(Map.of("message", body));
+                notificationMessage.setRecToken(user.getFirebaseToken());
+                System.out.println("Notification Sent to : " + user.getId() + " , token : " + user.getFirebaseToken());
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+
+                Notification notification = new Notification();
+                notification.setUserId(user.getId());
+                notification.setTitle(title);
+                notification.setText(body);
+                notification.setIsSent(!"Failed".equals(result));
+                notification.setNotificationType(JOB_CARD);
+                notificationRepository.save(notification);
+            }
         }
     }
 }
