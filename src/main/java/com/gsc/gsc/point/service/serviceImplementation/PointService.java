@@ -1,29 +1,46 @@
 package com.gsc.gsc.point.service.serviceImplementation;
 
+import com.gsc.gsc.constants.NotificationTypes;
 import com.gsc.gsc.constants.ReturnObject;
+import com.gsc.gsc.model.Notification;
 import com.gsc.gsc.model.Point;
 import com.gsc.gsc.model.User;
 import com.gsc.gsc.point.dto.AddPointsDTO;
+import com.gsc.gsc.repo.NotificationRepository;
 import com.gsc.gsc.repo.PointRepository;
 import com.gsc.gsc.repo.UserRepository;
+import com.gsc.gsc.utilities.FirebaseMessagingService;
+import com.gsc.gsc.utilities.NotificationMessage;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 import static com.gsc.gsc.utilities.LanguageConstants.ENGLISH;
 
 @Service
 public class PointService {
+
+    private static final Logger log = LoggerFactory.getLogger(PointService.class);
     @Autowired
     PointRepository pointRepository;
 
     @Autowired
     UserRepository userRepository;
+
+    @Autowired
+    NotificationRepository notificationRepository;
+
+    @Autowired
+    FirebaseMessagingService firebaseMessagingService;
 
     @Value("${jwt.secret}")
     private String SECRET_KEY;
@@ -37,6 +54,8 @@ public class PointService {
             Point point = new Point(addPointsDTO,adminId);
 
             pointRepository.save(point);
+
+            notifyCustomerForPoints(user, adminUser.getName(), addPointsDTO.getPoints(), addPointsDTO.getReason());
 
             ReturnObject returnObject = new ReturnObject();
             if (langId == ENGLISH)
@@ -99,11 +118,36 @@ public class PointService {
         }
     }
 
+    private void notifyCustomerForPoints(User customer, String adminName, Integer points, String reason) {
+        if (customer.getFirebaseToken() == null) return;
+
+        String title = "Points Added by " + adminName;
+        String body  = adminName + " has added " + points + " points to your account.";
+        if (reason != null && !reason.trim().isEmpty()) {
+            body += " Reason: " + reason;
+        }
+
+        NotificationMessage notificationMessage = new NotificationMessage();
+        notificationMessage.setTitle(title);
+        notificationMessage.setBody(body);
+        notificationMessage.setData(Map.of("message", body));
+        notificationMessage.setRecToken(customer.getFirebaseToken());
+        String result = firebaseMessagingService.sendNotification(notificationMessage);
+
+        Notification notification = new Notification();
+        notification.setUserId(customer.getId());
+        notification.setTitle(title);
+        notification.setText(body);
+        notification.setIsSent(!"Failed".equals(result));
+        notification.setNotificationType(NotificationTypes.ADMIN);
+        notificationRepository.save(notification);
+    }
+
     public Integer getUserIdFromToken(String token) {
 
         Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
         String userIdString = claims.getSubject();
-        System.out.println("getProperty " + token+" ,  "+ userIdString);
+        log.info("[TOKEN] Resolved userId={}", userIdString);
         return Integer.parseInt(userIdString);
     }
 }

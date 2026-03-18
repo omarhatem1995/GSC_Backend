@@ -2,6 +2,8 @@ package com.gsc.gsc.utilities;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -18,13 +20,17 @@ import java.io.IOException;
 @Service
 public class ImgBBService {
 
-    private final String API_KEY = "b3f704f407cf2d932b2ed5edf0496ced";
+    private static final String IMGBB_URL = "https://api.imgbb.com/1/upload";
+
+    @Value("${imgs.key}")
+    private String apiKey;
+
+    @Autowired
+    private RestTemplate restTemplate;
 
     public String uploadImage(MultipartFile file) throws IOException {
 
-        String url = "https://api.imgbb.com/1/upload?key=" + API_KEY;
-
-        RestTemplate restTemplate = new RestTemplate();
+        String url = IMGBB_URL + "?key=" + apiKey;
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("image", new ByteArrayResource(file.getBytes()) {
@@ -37,16 +43,18 @@ public class ImgBBService {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
-        HttpEntity<MultiValueMap<String, Object>> request =
-                new HttpEntity<>(body, headers);
+        HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
 
-        ResponseEntity<String> response =
-                restTemplate.postForEntity(url, request, String.class);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
 
-        // extract image URL from JSON response
         ObjectMapper mapper = new ObjectMapper();
         JsonNode root = mapper.readTree(response.getBody());
 
-        return root.path("data").path("url").asText();
+        String imageUrl = root.path("data").path("url").asText();
+        if (imageUrl == null || imageUrl.isEmpty()) {
+            throw new IOException("ImgBB upload failed: " + response.getBody());
+        }
+
+        return imageUrl;
     }
 }

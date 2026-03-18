@@ -1,0 +1,12 @@
+2026-03-18 23:48:48.902 INFO  [restartedMain] com.gsc.gsc.GscApplication - Starting GscApplication using Java 11.0.20.1 on Omar with PID 34376 (C:\Users\omarh\Projects\Private\GSC\GSC\target\classes started by omarh in C:\Users\omarh\Projects\Private\GSC\GSC)
+2026-03-18 23:48:48.903 INFO  [restartedMain] com.gsc.gsc.GscApplication - No active profile set, falling back to default profiles: default
+2026-03-18 23:48:52.874 WARN  [restartedMain] o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-03-18 23:48:53.960 INFO  [restartedMain] com.gsc.gsc.GscApplication - Started GscApplication in 5.39 seconds (JVM running for 6.371)
+2026-03-18 23:49:02.241 INFO  [http-nio-8025-exec-2] c.g.g.utilities.RequestLoggingFilter - [REQUEST]  GET /api/certificates | userId=2 | token=eyJhbGciOi...cgLo
+2026-03-18 23:49:02.829 INFO  [http-nio-8025-exec-2] c.g.g.utilities.RequestLoggingFilter - [RESPONSE] GET /api/certificates | status=200 | userId=2 | duration=764ms
+2026-03-18 23:56:44.172 INFO  [restartedMain] com.gsc.gsc.GscApplication - Starting GscApplication using Java 11.0.20.1 on Omar with PID 48072 (C:\Users\omarh\Projects\Private\GSC\GSC\target\classes started by omarh in C:\Users\omarh\Projects\Private\GSC\GSC)
+2026-03-18 23:56:44.174 INFO  [restartedMain] com.gsc.gsc.GscApplication - No active profile set, falling back to default profiles: default
+2026-03-18 23:56:47.894 WARN  [restartedMain] o.s.b.a.o.j.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-03-18 23:56:48.850 INFO  [restartedMain] com.gsc.gsc.GscApplication - Started GscApplication in 4.981 seconds (JVM running for 6.024)
+2026-03-18 23:56:54.120 INFO  [http-nio-8025-exec-2] c.g.g.utilities.RequestLoggingFilter - [REQUEST]  GET /api/certificates | userId=2 | token=eyJhbGciOi...cgLo
+2026-03-18 23:56:54.670 INFO  [http-nio-8025-exec-2] c.g.g.utilities.RequestLoggingFilter - [RESPONSE] GET /api/certificates | status=200 | userId=2 | duration=726ms
