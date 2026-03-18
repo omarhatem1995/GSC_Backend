@@ -1,4 +1,4 @@
-package com.gsc.gsc.point.service;
+package com.gsc.gsc.point.service.serviceImplementation;
 
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.model.Point;

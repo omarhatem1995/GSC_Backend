@@ -1,4 +1,4 @@
-package com.gsc.gsc.configurations.service;
+package com.gsc.gsc.configurations.service.serviceImplementation;
 
 import com.gsc.gsc.configurations.dto.*;
 import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;

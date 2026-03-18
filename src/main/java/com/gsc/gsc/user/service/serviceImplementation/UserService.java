@@ -1,7 +1,7 @@
 package com.gsc.gsc.user.service.serviceImplementation;
 
 import com.gsc.gsc.constants.ReturnObject;
-import com.gsc.gsc.email.EmailService;
+import com.gsc.gsc.email.service.EmailService;
 import com.gsc.gsc.model.FirebaseToken;
 import com.gsc.gsc.model.User;
 import com.gsc.gsc.repo.PointRepository;
@@ -327,15 +327,24 @@ public class UserService implements IUserService {
         System.out.println(e.getMessage());
         return new ResponseEntity<>(new DefaultResponseDTO(3, "Bad request"), HttpStatus.BAD_REQUEST);
     }
-    public  ResponseEntity<?>  logout(HttpServletResponse httpRes) {
+    public ResponseEntity<?> logout(String token, HttpServletResponse httpRes) {
         ReturnObject returnObject = new ReturnObject();
         try {
+            // Invalidate the token server-side by recording the logout time on the user
+            Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
+            Integer userId = Integer.parseInt(claims.getSubject());
+            User user = userRepository.findUserById(userId);
+            if (user != null) {
+                user.setLastLogoutAt(Timestamp.valueOf(LocalDateTime.now()));
+                userRepository.save(user);
+            }
+            // Clear the cookie on the client side
             authenticationService.logout(httpRes);
             returnObject.setStatus(true);
             returnObject.setData(null);
             returnObject.setMessage("Success");
             return ResponseEntity.ok(returnObject);
-        }catch (Exception exception){
+        } catch (Exception exception) {
             returnObject.setMessage(exception.getMessage());
             returnObject.setData(null);
             returnObject.setStatus(false);
@@ -379,11 +388,22 @@ public class UserService implements IUserService {
 
 
     public Integer getUserIdFromToken(String token) {
-
         Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
         String userIdString = claims.getSubject();
-        System.out.println("getProperty " + token+" ,  "+ userIdString);
-        return Integer.parseInt(userIdString);
+        System.out.println("getProperty " + token + " ,  " + userIdString);
+        Integer userId = Integer.parseInt(userIdString);
+
+        // Reject token if it was issued before the user's last logout
+        User user = userRepository.findUserById(userId);
+        if (user != null && user.getLastLogoutAt() != null) {
+            java.util.Date issuedAt = claims.getIssuedAt();
+            if (issuedAt != null && !issuedAt.after(user.getLastLogoutAt())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Token has been invalidated. Please login again.");
+            }
+        }
+
+        return userId;
     }
 
 }

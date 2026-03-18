@@ -1,4 +1,4 @@
-package com.gsc.gsc.image;
+package com.gsc.gsc.image.service;
 
 import com.gsc.gsc.repo.UserRepository;
 import com.gsc.gsc.user.service.serviceImplementation.UserService;

@@ -22,6 +22,18 @@ public class BillType {
     @Column(name = "code")
     private String code;
     @Basic
+    @Column(name = "name_en")
+    private String nameEn;
+    @Basic
+    @Column(name = "name_ar")
+    private String nameAr;
+    @Basic
+    @Column(name = "description_en")
+    private String descriptionEn;
+    @Basic
+    @Column(name = "description_ar")
+    private String descriptionAr;
+    @Basic
     @Column(name = "created_at")
     private Timestamp createdAt;
     @Basic

@@ -1,6 +1,7 @@
 package com.gsc.gsc.bill.service.serviceImplementation;
 
 import com.gsc.gsc.bill.dto.*;
+import com.gsc.gsc.bill.service.serviceInterface.IBillService;
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.constants.ReturnObjectPaging;
@@ -65,8 +66,6 @@ public class BillService implements IBillService {
     private ProductDetailsViewRepository productDetailsViewRepository;
     @Autowired
     private ProductManufacturerRepository manufacturerRepository;
-    @Autowired
-    private BillTypeTextRepository billTypeTextRepository;
     @Autowired
     private JobCardRepository jobCardRepository;
     @Autowired
@@ -910,11 +909,7 @@ public class BillService implements IBillService {
     }
 
     public Integer getUserIdFromToken(String token) {
-
-        Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
-        String userIdString = claims.getSubject();
-        System.out.println("getProperty " + token + " ,  " + userIdString);
-        return Integer.parseInt(userIdString);
+        return userService.getUserIdFromToken(token);
     }
 
     public ResponseEntity getBillsForAdminByTokenForUserId(String token, int langId, Integer userId, Pageable

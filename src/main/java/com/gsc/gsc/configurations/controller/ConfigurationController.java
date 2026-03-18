@@ -1,6 +1,7 @@
 package com.gsc.gsc.configurations.controller;
 
 import com.gsc.gsc.configurations.dto.CreateManufacturerDTO;
+import com.gsc.gsc.configurations.service.serviceImplementation.ConfigurationService;
 import com.gsc.gsc.model.PagingClass;
 import com.gsc.gsc.product.dto.ManufacturerRequest;
 import org.springframework.beans.factory.annotation.Autowired;

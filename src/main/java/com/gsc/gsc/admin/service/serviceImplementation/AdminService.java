@@ -351,11 +351,7 @@ public class AdminService implements IAdminService {
     }
 
     public Integer getUserIdFromToken(String token) {
-
-        Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
-        String userIdString = claims.getSubject();
-        System.out.println("token :  " + token + " , userID : " + userIdString);
-        return Integer.parseInt(userIdString);
+        return userService.getUserIdFromToken(token);
     }
 
     public ResponseEntity getUserById(String token, Integer userId) {

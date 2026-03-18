@@ -1,7 +1,7 @@
 package com.gsc.gsc.product_model.controller;
 
 import com.gsc.gsc.vehicle_models.service.serviceImplementation.ModelService;
-import com.gsc.gsc.product_model.service.ProductModelService;
+import com.gsc.gsc.product_model.service.serviceImplementation.ProductModelService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

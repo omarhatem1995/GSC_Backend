@@ -71,6 +71,9 @@ public class User {
     @Basic
     @Column(name = "updated_at")
     private Timestamp updatedAt;
+    @Basic
+    @Column(name = "last_logout_at")
+    private Timestamp lastLogoutAt;
 
     public User(UserDTO userDTO) {
         if(userDTO.getId()!=null)

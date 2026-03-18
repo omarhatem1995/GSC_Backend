@@ -1,7 +1,7 @@
 package com.gsc.gsc.point.controller;
 
 import com.gsc.gsc.point.dto.AddPointsDTO;
-import com.gsc.gsc.point.service.PointService;
+import com.gsc.gsc.point.service.serviceImplementation.PointService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

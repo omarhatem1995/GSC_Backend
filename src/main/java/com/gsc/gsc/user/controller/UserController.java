@@ -65,7 +65,7 @@ public class UserController {
     @GetMapping({"/logout"})
     public ResponseEntity<?> logout(@RequestHeader("Authorization") String token,
                                     HttpServletResponse httpRes) {
-        return userService.logout(httpRes);
+        return userService.logout(token, httpRes);
     }
 
 }

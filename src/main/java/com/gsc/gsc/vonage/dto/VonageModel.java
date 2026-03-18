@@ -1,4 +1,4 @@
-package com.gsc.gsc.vonage;
+package com.gsc.gsc.vonage.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,4 +1,4 @@
-package com.gsc.gsc.inventory.service;
+package com.gsc.gsc.inventory.service.serviceImplementation;
 
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.constants.ReturnObjectPaging;
@@ -430,11 +430,22 @@ public class ProductServiceV2 {
 
 
     public Integer getUserIdFromToken(String token) {
-
         Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token).getBody();
         String userIdString = claims.getSubject();
         System.out.println("getProperty " + token + " ,  " + userIdString);
-        return Integer.parseInt(userIdString);
+        Integer userId = Integer.parseInt(userIdString);
+
+        // Reject token if it was issued before the user's last logout
+        com.gsc.gsc.model.User user = userRepository.findUserById(userId);
+        if (user != null && user.getLastLogoutAt() != null) {
+            java.util.Date issuedAt = claims.getIssuedAt();
+            if (issuedAt != null && !issuedAt.after(user.getLastLogoutAt())) {
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.UNAUTHORIZED, "Token has been invalidated. Please login again.");
+            }
+        }
+
+        return userId;
     }
 
     public ResponseEntity getProducts(String token, int langId, Pageable pageable) {

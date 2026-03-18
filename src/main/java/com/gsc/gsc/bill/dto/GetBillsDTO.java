@@ -4,8 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.persistence.Basic;
-import javax.persistence.Column;
 import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
@@ -27,17 +25,22 @@ public class GetBillsDTO {
     String customerNotes;
     String carLicenseNumber;
     String carCode;
-    String billTypeName;
+    String billTypeNameEn;
+    String billTypeNameAr;
     String billTypeCode;
-    String billDescription;
-    Double  billTotal;
-    Double  remainingAmount;
+    String billDescriptionEn;
+    String billDescriptionAr;
+    Double billTotal;
+    Double remainingAmount;
 
+    // Used by queries that join CBillsStatusText (with langId) — 18 args
     public GetBillsDTO(Integer id, String referenceNumber, Integer userId, String status,
                        String billStatusTypeCode, Integer createdBy, Double total,
                        Double discount, Date createdAt, String adminNotes, String customerNotes,
-                       String carLicenseNumber, String carCode, String billTypeName,
-                       String billTypeCode, String billDescription) {
+                       String carLicenseNumber, String carCode,
+                       String billTypeNameEn, String billTypeNameAr,
+                       String billTypeCode,
+                       String billDescriptionEn, String billDescriptionAr) {
         this.id = id;
         this.referenceNumber = referenceNumber;
         this.userId = userId;
@@ -51,18 +54,22 @@ public class GetBillsDTO {
         this.customerNotes = customerNotes;
         this.carLicenseNumber = carLicenseNumber;
         this.carCode = carCode;
-        this.billTypeName = billTypeName;
+        this.billTypeNameEn = billTypeNameEn;
+        this.billTypeNameAr = billTypeNameAr;
         this.billTypeCode = billTypeCode;
-        this.billDescription = billDescription;
+        this.billDescriptionEn = billDescriptionEn;
+        this.billDescriptionAr = billDescriptionAr;
     }
 
+    // Used by findByFilters (admin) — 21 args
     public GetBillsDTO(Integer id, String referenceNumber, Integer userId, String status,
                        String billStatusTypeCode, Integer createdBy, Double total,
                        Double discount, Date createdAt, String adminNotes, String customerNotes,
-                       String carLicenseNumber, String carCode, String billTypeName,
-                       String billTypeCode, String billDescription,
-                       String customerName, Integer customerType , Double finalTotalPrice) {
-
+                       String carLicenseNumber, String carCode,
+                       String billTypeNameEn, String billTypeNameAr,
+                       String billTypeCode,
+                       String billDescriptionEn, String billDescriptionAr,
+                       String customerName, Integer customerType, Double finalTotalPrice) {
         this.id = id;
         this.referenceNumber = referenceNumber;
         this.userId = userId;
@@ -76,9 +83,11 @@ public class GetBillsDTO {
         this.customerNotes = customerNotes;
         this.carLicenseNumber = carLicenseNumber;
         this.carCode = carCode;
-        this.billTypeName = billTypeName;
+        this.billTypeNameEn = billTypeNameEn;
+        this.billTypeNameAr = billTypeNameAr;
         this.billTypeCode = billTypeCode;
-        this.billDescription = billDescription;
+        this.billDescriptionEn = billDescriptionEn;
+        this.billDescriptionAr = billDescriptionAr;
         this.customerName = customerName;
         this.customerType = customerType;
         this.finalTotalPrice = finalTotalPrice;
@@ -88,5 +97,3 @@ public class GetBillsDTO {
     Integer customerType;
     Double finalTotalPrice;
 }
-
-

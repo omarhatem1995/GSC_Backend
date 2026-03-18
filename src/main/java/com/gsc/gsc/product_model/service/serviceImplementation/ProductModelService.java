@@ -1,4 +1,4 @@
-package com.gsc.gsc.product_model.service;
+package com.gsc.gsc.product_model.service.serviceImplementation;
 
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.model.Car;

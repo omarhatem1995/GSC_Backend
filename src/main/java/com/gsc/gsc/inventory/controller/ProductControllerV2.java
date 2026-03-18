@@ -1,7 +1,7 @@
 package com.gsc.gsc.inventory.controller;
 
 import com.gsc.gsc.inventory.dto.CreateProductDTO;
-import com.gsc.gsc.inventory.service.ProductServiceV2;
+import com.gsc.gsc.inventory.service.serviceImplementation.ProductServiceV2;
 import com.gsc.gsc.model.PagingClass;
 import com.gsc.gsc.product.dto.ProductDTO;
 import org.springframework.beans.factory.annotation.Autowired;

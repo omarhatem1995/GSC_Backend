@@ -2,7 +2,7 @@ package com.gsc.gsc.user.security;
 
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.constants.UserTypes;
-import com.gsc.gsc.email.EmailService;
+import com.gsc.gsc.email.service.EmailService;
 import com.gsc.gsc.model.User;
 import com.gsc.gsc.repo.PointRepository;
 import com.gsc.gsc.repo.UserRepository;

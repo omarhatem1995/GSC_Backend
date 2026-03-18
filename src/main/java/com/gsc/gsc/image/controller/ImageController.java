@@ -1,5 +1,6 @@
 package com.gsc.gsc.image.controller;
 
+import com.gsc.gsc.utilities.FirebaseStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

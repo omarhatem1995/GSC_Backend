@@ -1,4 +1,4 @@
-package com.gsc.gsc.email;
+package com.gsc.gsc.email.service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;

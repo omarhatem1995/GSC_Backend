@@ -1,6 +1,7 @@
 package com.gsc.gsc.job_cards.controller;
 
 import com.gsc.gsc.constants.ReturnObject;
+import com.gsc.gsc.job_cards.pdf.JobCardPdfGeneratorITextService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
