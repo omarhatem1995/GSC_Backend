@@ -18,7 +18,6 @@ public class ProductDTO {
     Integer quantity;
     Integer brandId;
     String partNo;
-    Integer storeId;
     Double cost;
     List<Integer> sellerBrandsList;
     String productNameEn;

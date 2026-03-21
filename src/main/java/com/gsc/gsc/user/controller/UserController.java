@@ -27,7 +27,8 @@ public class UserController {
     }
 
     @PutMapping("update")
-    public ResponseEntity updateUser(@RequestHeader ("Authorization") String token, @RequestBody UserDTO userDTO) {
+    public ResponseEntity updateUser(@RequestHeader ("Authorization") String token,
+                                     @RequestBody UserDTO userDTO) {
         return userService.update(token,userDTO);
     }
 

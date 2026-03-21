@@ -10,7 +10,6 @@ public class GetAllProductsDTO {
     Integer brandId;
     Integer productId;
     Integer sellerBrandId;
-    Integer storeId;
     Integer createdById;
     String partNo;
     Double price;

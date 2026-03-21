@@ -1,5 +1,6 @@
 package com.gsc.gsc.product.service.serviceImplementation;
 
+import com.gsc.gsc.admin.service.serviceImplementation.AdminPermissionService;
 import com.gsc.gsc.brand.dto.BrandDTO;
 import com.gsc.gsc.brand.dto.ProductBrandDTO;
 import com.gsc.gsc.constants.ReturnObject;
@@ -47,8 +48,6 @@ public class ProductService implements IProductService {
     @Autowired
     private ProductOeNumberRepository productOeNumberRepository;
     @Autowired
-    private ProductStoreRepository productStoreRepository;
-    @Autowired
     private DiscountRepository discountRepository;
     @Autowired
     private PromoRepository promoRepository;
@@ -65,36 +64,12 @@ public class ProductService implements IProductService {
     private ImgBBService imgBBService;
     @Autowired
     private ProductImagesRepository productImagesRepository;
+    @Autowired
+    private AdminPermissionService adminPermissionService;
 
     @Override
     public Optional<Car> getById(Integer id) {
         return Optional.empty();
-    }
-
-    public ResponseEntity findProductsForStoreId(String token, Integer storeId) {
-        ReturnObject returnObject = new ReturnObject();
-        Integer userId = getUserIdFromToken(token);
-        User userAdmin = userRepository.findUserById(userId);
-        if (userId != null && userAdmin.getAccountTypeId() == ADMIN_TYPE) {
-            Optional<List<ProductStore>> productsStoreList = productStoreRepository.findAllByStoreId(storeId);
-            if (productsStoreList.isPresent()) {
-                returnObject.setMessage("Loaded Successfully");
-                returnObject.setStatus(true);
-                returnObject.setData(productsStoreList.get());
-                return ResponseEntity.ok(returnObject);
-            } else {
-                returnObject.setMessage("No Products Added");
-                returnObject.setData(null);
-                returnObject.setStatus(true);
-                return ResponseEntity.ok(returnObject);
-
-            }
-        } else {
-            returnObject.setMessage("User UnAuthorized");
-            returnObject.setData(null);
-            returnObject.setStatus(false);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-        }
     }
 
     @Transactional
@@ -104,6 +79,12 @@ public class ProductService implements IProductService {
         User userAdmin = userRepository.findUserById(userId);
         if (userId == null || userAdmin.getAccountTypeId() != ADMIN_TYPE) {
             returnObject.setMessage("This is not admin user");
+            returnObject.setData(null);
+            returnObject.setStatus(false);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+        if (!adminPermissionService.canAddProducts(userId)) {
+            returnObject.setMessage("You do not have permission to add products");
             returnObject.setData(null);
             returnObject.setStatus(false);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
@@ -252,6 +233,12 @@ public class ProductService implements IProductService {
         User userAdmin = userRepository.findUserById(userId);
 
         if (userId != null && userAdmin.getAccountTypeId() == ADMIN_TYPE) {
+            if (!adminPermissionService.canMaintainPrices(userId)) {
+                returnObject.setData(null);
+                returnObject.setStatus(false);
+                returnObject.setMessage("You do not have permission to maintain product prices");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+            }
             Optional<Product> existingProductOptional = productRepository.findById(productId);
 
             if (existingProductOptional.isPresent()) {
@@ -276,17 +263,6 @@ public class ProductService implements IProductService {
                 // Save the updated product
                 existingProduct = productRepository.save(existingProduct);
 
-                // Update information in the product store
-                Optional<ProductStore> productStoreOptional = productStoreRepository.findByProductId(existingProduct.getId());
-                if (productStoreOptional.isPresent()) {
-                    ProductStore productStore = productStoreOptional.get();
-                    productStore.setStoreId(dto.getStoreId());
-                    productStore.setQuantity(dto.getQuantity());
-                    if (!dto.getOeNumber().isEmpty())
-                        productStore.setOeNumber(dto.getOeNumber().get(0));
-                    productStore.setLocation(dto.getLocation());
-                    productStoreRepository.save(productStore);
-                }
 /*                // Update information in the product brand
                 Optional<ProductBrand> productBrandOptional = productBrandRepository.findByProductId(existingProduct.getId());
                 if (productBrandOptional.isPresent()) {
@@ -427,7 +403,7 @@ public class ProductService implements IProductService {
                 }
                 manufacturerList.add(productManufacturerDTO);
             }
-            productDetailsDTO.setStores(manufacturerList);
+            productDetailsDTO.setManufacturers(manufacturerList);
         }
 
         List<ProductVehicle> productVehicleList = productVehicleRepository.findAllByProductId(productId);

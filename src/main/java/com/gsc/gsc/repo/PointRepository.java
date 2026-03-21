@@ -16,4 +16,10 @@ public interface PointRepository extends JpaRepository<Point, Integer> {
     List<PointsDTO> findPointsByUserId(@Param("userId") Integer userId);
 
     List<Point> findAllByUserId(Integer userId);
+
+    @Query("SELECT COALESCE(SUM(p.pointsNumber), 0) FROM Point p WHERE p.createdBy = :adminId AND p.userId = :userId")
+    Integer sumPointsGivenByAdminToUser(@Param("adminId") Integer adminId, @Param("userId") Integer userId);
+
+    @Query("SELECT COALESCE(SUM(p.pointsNumber), 0) FROM Point p WHERE p.userId = :userId")
+    Integer sumPointsByUserId(@Param("userId") Integer userId);
 }

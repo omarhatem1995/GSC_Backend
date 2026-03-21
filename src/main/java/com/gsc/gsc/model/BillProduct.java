@@ -18,7 +18,8 @@ public class BillProduct {
     @Id
     @Column(name = "id")
     private Integer id;
-    @Column(name = "product_id", nullable = false, columnDefinition = "int default 999999")
+    // null = free-text "other" product not in the product catalog
+    @Column(name = "product_id", nullable = true)
     private Integer productId;
     @Column(name = "bill_id")
     private Integer billId;

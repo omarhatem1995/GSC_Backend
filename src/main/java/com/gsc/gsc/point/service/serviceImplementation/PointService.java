@@ -6,6 +6,7 @@ import com.gsc.gsc.model.Notification;
 import com.gsc.gsc.model.Point;
 import com.gsc.gsc.model.User;
 import com.gsc.gsc.point.dto.AddPointsDTO;
+import com.gsc.gsc.admin.service.serviceImplementation.AdminPermissionService;
 import com.gsc.gsc.repo.NotificationRepository;
 import com.gsc.gsc.repo.PointRepository;
 import com.gsc.gsc.repo.UserRepository;
@@ -41,6 +42,8 @@ public class PointService {
 
     @Autowired
     FirebaseMessagingService firebaseMessagingService;
+    @Autowired
+    AdminPermissionService adminPermissionService;
 
     @Value("${jwt.secret}")
     private String SECRET_KEY;
@@ -48,8 +51,31 @@ public class PointService {
         Integer adminId = getUserIdFromToken(token);
         User adminUser = userRepository.findUserById(adminId);
         if(adminUser.getAccountTypeId() == ADMIN_TYPE){
+
+        // Permission check
+        String permissionError = adminPermissionService.checkPointsLimit(adminId, userId, addPointsDTO.getPoints());
+        if (permissionError != null) {
+            ReturnObject returnObject = new ReturnObject();
+            returnObject.setMessage(permissionError);
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
         User user = userRepository.findUserById(userId);
         if (user != null) {
+            // Guard: prevent total points from going negative
+            if (addPointsDTO.getPoints() < 0) {
+                Integer currentTotal = pointRepository.sumPointsByUserId(userId);
+                if (currentTotal + addPointsDTO.getPoints() < 0) {
+                    ReturnObject returnObject = new ReturnObject();
+                    returnObject.setMessage("Insufficient points. User only has " + currentTotal + " points.");
+                    returnObject.setStatus(false);
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                }
+            }
+
             addPointsDTO.setUserId(userId);
             Point point = new Point(addPointsDTO,adminId);
 
@@ -138,8 +164,9 @@ public class PointService {
         notification.setUserId(customer.getId());
         notification.setTitle(title);
         notification.setText(body);
+        notification.setReason(reason);
         notification.setIsSent(!"Failed".equals(result));
-        notification.setNotificationType(NotificationTypes.ADMIN);
+        notification.setNotificationType(NotificationTypes.POINTS);
         notificationRepository.save(notification);
     }
 

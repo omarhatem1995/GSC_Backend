@@ -1,5 +1,6 @@
 package com.gsc.gsc.bill.service.serviceImplementation;
 
+import com.gsc.gsc.admin.service.serviceImplementation.AdminPermissionService;
 import com.gsc.gsc.bill.dto.*;
 import com.gsc.gsc.bill.service.serviceInterface.IBillService;
 import com.gsc.gsc.car.dto.CarDTO;
@@ -51,6 +52,8 @@ public class BillService implements IBillService {
     private String SECRET_KEY;
     @Autowired
     private UserService userService;
+    @Autowired
+    private AdminPermissionService adminPermissionService;
     @Autowired
     private BillRepository billRepository;
     @Autowired
@@ -361,17 +364,17 @@ public class BillService implements IBillService {
 
             if (!addBillDTO.getProductBillDTOList().isEmpty()) {
 
+                // ── PHASE 1: Validate all products — NO DB writes yet ──
+                List<ProductManufacturer> resolvedManufacturers = new ArrayList<>();
                 for (ProductBillDTO productBillDTO : addBillDTO.getProductBillDTOList()) {
 
                     ProductManufacturer manufacturer;
 
                     if (productBillDTO.getSellerBrandId() == null) {
-                        // Logic: Fallback to the record with the least quantity
                         manufacturer = manufacturerRepository
                                 .findFirstByProductIdOrderByQuantityAsc(productBillDTO.getId())
                                 .orElse(null);
                     } else {
-                        // Logic: Original specific seller brand lookup
                         manufacturer = manufacturerRepository
                                 .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
                                 .orElse(null);
@@ -379,47 +382,61 @@ public class BillService implements IBillService {
 
                     if (manufacturer == null) {
                         returnObject.setStatus(false);
-                        returnObject.setMessage("Manufacturer not found for this product");
+                        returnObject.setMessage("Manufacturer not found for product: " + productBillDTO.getProductName());
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
                     }
 
                     Integer availableQty = manufacturer.getQuantity();
                     Integer requestedQty = productBillDTO.getQuantity();
 
-                    if (availableQty < requestedQty) {
+                    // null quantity means unlimited stock — skip the check
+                    if (availableQty != null && availableQty < requestedQty) {
                         returnObject.setStatus(false);
-                        returnObject.setMessage("Forbidden: Not enough quantity for product "
-                                + productBillDTO.getProductName());
+                        returnObject.setMessage("Not enough quantity for product "
+                                + productBillDTO.getProductName()
+                                + ". Available: " + availableQty);
                         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
                     }
 
-                    bill.setStatusId(NOT_PAID);
-                    bill.setBillTypeId(billTypeOptional.get().getId());
-                    bill.setCreatedBy(ADMIN_TYPE);
-                    bill.setAdminNotes(addBillDTO.getPrivateNotes());
-                    bill.setCustomerNotes(addBillDTO.getNotes());
-                    bill.setTotal(addBillDTO.getTotal());
-                    bill.setDiscount(addBillDTO.getDiscount());
-                    bill.setDiscountType(addBillDTO.getDiscountType());
-                    bill.setFinalTotalPrice(addBillDTO.getFinalTotalPrice());
-                    bill.setDownPayment(addBillDTO.getDownPayment());
-                    bill.setDate(addBillDTO.getDate());
-                    bill.setUserId(addBillDTO.getUserId());
-                    bill = billRepository.save(bill);
-
-                    // ✅ Take price from DB not frontend
+                    // Store resolved price from DB into the DTO for use in phase 2
                     productBillDTO.setPrice(manufacturer.getPrice());
+                    resolvedManufacturers.add(manufacturer);
+                }
 
-                    // ✅ Reduce quantity
-                    manufacturer.setQuantity(availableQty - requestedQty);
+                // ── PHASE 2: All validations passed — now save the bill and write to DB ──
+                bill.setStatusId(NOT_PAID);
+                bill.setBillTypeId(billTypeOptional.get().getId());
+                bill.setCreatedBy(ADMIN_TYPE);
+                bill.setAdminNotes(addBillDTO.getPrivateNotes());
+                bill.setCustomerNotes(addBillDTO.getNotes());
+                bill.setTotal(addBillDTO.getTotal());
+                bill.setDiscount(addBillDTO.getDiscount());
+                bill.setDiscountType(addBillDTO.getDiscountType());
+                bill.setFinalTotalPrice(addBillDTO.getFinalTotalPrice());
+                bill.setDownPayment(addBillDTO.getDownPayment());
+                bill.setDate(addBillDTO.getDate());
+                bill.setUserId(addBillDTO.getUserId());
+                bill = billRepository.save(bill);
+
+                for (int i = 0; i < addBillDTO.getProductBillDTOList().size(); i++) {
+                    ProductBillDTO productBillDTO = addBillDTO.getProductBillDTOList().get(i);
+                    ProductManufacturer manufacturer = resolvedManufacturers.get(i);
+
+                    Integer availableQty = manufacturer.getQuantity();
+                    Integer requestedQty = productBillDTO.getQuantity();
+
+                    // Decrement quantity only if tracked (null = unlimited)
+                    if (availableQty != null) {
+                        manufacturer.setQuantity(availableQty - requestedQty);
+                    }
                     manufacturer = manufacturerRepository.save(manufacturer);
 
                     BillProduct billProduct = new BillProduct();
-                    billProduct.setProductId((productBillDTO.getId()));
+                    billProduct.setProductId(productBillDTO.getId());
                     billProduct.setBillId(bill.getId());
-                    billProduct.setPrice((productBillDTO.getPrice()));
-                    billProduct.setQuantity((productBillDTO.getQuantity()));
-                    billProduct.setName((productBillDTO.getProductName()));
+                    billProduct.setPrice(productBillDTO.getPrice());
+                    billProduct.setQuantity(productBillDTO.getQuantity());
+                    billProduct.setName(productBillDTO.getProductName());
                     billProduct.setProductManufacturerId(manufacturer.getId());
                     billProductRepository.save(billProduct);
                 }
@@ -449,7 +466,7 @@ public class BillService implements IBillService {
                     BillProduct billProduct = new BillProduct();
                     billProduct.setBillId(bill.getId());
                     billProduct.setName(addBillDTO.getOtherProductsDTOList().get(i).getProductName());
-                    billProduct.setProductId(999999);
+                    billProduct.setProductId(null);
                     billProduct.setPrice(Double.valueOf(addBillDTO.getOtherProductsDTOList().get(i).getPrice()));
                     billProduct.setQuantity(addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
                     billProductList.add(billProduct);
@@ -740,6 +757,40 @@ public class BillService implements IBillService {
         }*/
 
         if (user.getAccountTypeId() == ADMIN_TYPE) {
+            // Discount permission check — runs before any field is modified
+            if (addBillDTO.getDiscount() != null && addBillDTO.getDiscount() > 0
+                    && addBillDTO.getDiscountType() != null) {
+
+                double effectivePercent;
+                String discountType = addBillDTO.getDiscountType().toUpperCase();
+
+                if (discountType.equals("AMOUNT")) {
+                    // Convert amount discount to percentage for permission check
+                    Double total = addBillDTO.getTotal();
+                    if (total != null && total > 0) {
+                        effectivePercent = (addBillDTO.getDiscount() / total) * 100.0;
+                    } else {
+                        effectivePercent = 0.0;
+                    }
+                } else {
+                    // PERCENTAGE or PERCENT — use as-is
+                    effectivePercent = addBillDTO.getDiscount();
+                }
+
+                if (effectivePercent > 0) {
+                    String discountError = adminPermissionService.checkDiscountLimit(userId, effectivePercent);
+                    if (discountError != null) {
+                        Double maxAllowed = adminPermissionService.getPermission(userId)
+                                .map(p -> p.getMaxBillDiscountPercent())
+                                .orElse(0.0);
+                        returnObject.setStatus(false);
+                        returnObject.setMessage(discountError + ". Maximum allowed discount is: " + maxAllowed + "%");
+                        returnObject.setData(null);
+                        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+                    }
+                }
+            }
+
             // Update existing bill properties
             existingBill.setAdminNotes(addBillDTO.getPrivateNotes());
             existingBill.setCustomerNotes(addBillDTO.getNotes());
@@ -858,19 +909,18 @@ public class BillService implements IBillService {
 
             }
 
+            // ── PHASE 1: Validate all products — NO DB writes yet ──
+            List<ProductManufacturer> resolvedManufacturers = new ArrayList<>();
             if (!addBillDTO.getProductBillDTOList().isEmpty()) {
-
                 for (ProductBillDTO productBillDTO : addBillDTO.getProductBillDTOList()) {
 
                     ProductManufacturer manufacturer;
 
                     if (productBillDTO.getSellerBrandId() == null) {
-                        // Logic: Fallback to the record with the least quantity
                         manufacturer = manufacturerRepository
                                 .findFirstByProductIdOrderByQuantityAsc(productBillDTO.getId())
                                 .orElse(null);
                     } else {
-                        // Logic: Original specific seller brand lookup
                         manufacturer = manufacturerRepository
                                 .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
                                 .orElse(null);
@@ -878,58 +928,29 @@ public class BillService implements IBillService {
 
                     if (manufacturer == null) {
                         returnObject.setStatus(false);
-                        returnObject.setMessage("Manufacturer not found for this product");
+                        returnObject.setMessage("Manufacturer not found for product: " + productBillDTO.getProductName());
                         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
                     }
 
                     Integer availableQty = manufacturer.getQuantity();
                     Integer requestedQty = productBillDTO.getQuantity();
 
-                    if (availableQty < requestedQty) {
+                    // null quantity means unlimited stock — skip the check
+                    if (availableQty != null && availableQty < requestedQty) {
                         returnObject.setStatus(false);
-                        returnObject.setMessage("Forbidden: Not enough quantity for product "
-                                + productBillDTO.getProductName());
+                        returnObject.setMessage("Not enough quantity for product "
+                                + productBillDTO.getProductName()
+                                + ". Available: " + availableQty);
                         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
                     }
 
-                    bill.setStatusId(NOT_PAID);
-                    bill.setBillTypeId(billTypeId);
-                    bill.setCreatedBy(ADMIN_TYPE);
-                    bill.setAdminNotes(addBillDTO.getPrivateNotes());
-                    bill.setCustomerNotes(addBillDTO.getNotes());
-                    bill.setTotal(addBillDTO.getTotal());
-                    bill.setDiscount(addBillDTO.getDiscount());
-                    bill.setDiscountType(addBillDTO.getDiscountType());
-                    bill.setFinalTotalPrice(addBillDTO.getFinalTotalPrice());
-                    bill.setDownPayment(addBillDTO.getDownPayment());
-                    bill.setDate(addBillDTO.getDate());
-                    bill.setUserId(addBillDTO.getUserId());
-                    bill = billRepository.save(bill);
-
-                    // ✅ Take price from DB not frontend
+                    // Store resolved price from DB into the DTO for use in phase 2
                     productBillDTO.setPrice(manufacturer.getPrice());
-
-                    // ✅ Reduce quantity
-                    manufacturer.setQuantity(availableQty - requestedQty);
-                    manufacturer = manufacturerRepository.save(manufacturer);
-
-                    BillProduct billProduct = new BillProduct();
-                    billProduct.setProductId((productBillDTO.getId()));
-                    billProduct.setBillId(bill.getId());
-                    billProduct.setPrice((productBillDTO.getPrice()));
-                    billProduct.setQuantity((productBillDTO.getQuantity()));
-                    billProduct.setName((productBillDTO.getProductName()));
-                    billProduct.setProductManufacturerId(manufacturer.getId());
-                    billProductRepository.save(billProduct);
+                    resolvedManufacturers.add(manufacturer);
                 }
             }
-            List<Bill> allBillsByReferenceNumber = billRepository.findAllByReferenceNumber(bill.getReferenceNumber());
-            if (!allBillsByReferenceNumber.isEmpty()) {
-                returnObject.setData(null);
-                returnObject.setStatus(false);
-                returnObject.setMessage("Bill with same reference Number Already Created");
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
-            }
+
+            // ── PHASE 2: All validations passed — now save the bill and write to DB ──
             bill.setStatusId(NOT_PAID);
             Optional<BillType> billTypeOptional = billTypeRepository.findBillTypeByCode(String.valueOf(addBillDTO.getBillTypeId()));
             if (billTypeOptional.isPresent()) {
@@ -946,17 +967,29 @@ public class BillService implements IBillService {
             bill.setDate(addBillDTO.getDate());
             bill.setUserId(userId);
             bill = billRepository.save(bill);
+
             List<BillProduct> billProductList = new ArrayList<>();
             if (!addBillDTO.getProductBillDTOList().isEmpty()) {
-                for (ProductBillDTO productBillDTO : addBillDTO.getProductBillDTOList()) {
+                for (int i = 0; i < addBillDTO.getProductBillDTOList().size(); i++) {
+                    ProductBillDTO productBillDTO = addBillDTO.getProductBillDTOList().get(i);
+                    ProductManufacturer manufacturer = resolvedManufacturers.get(i);
+
+                    Integer availableQty = manufacturer.getQuantity();
+                    Integer requestedQty = productBillDTO.getQuantity();
+
+                    // Decrement quantity only if tracked (null = unlimited)
+                    if (availableQty != null) {
+                        manufacturer.setQuantity(availableQty - requestedQty);
+                        manufacturerRepository.save(manufacturer);
+                    }
+
                     BillProduct billProduct = new BillProduct();
                     billProduct.setProductId(productBillDTO.getId());
                     billProduct.setBillId(bill.getId());
-                    billProduct.setPrice(productBillDTO.getPrice()); // from DB
+                    billProduct.setPrice(productBillDTO.getPrice()); // resolved from DB in phase 1
                     billProduct.setQuantity(productBillDTO.getQuantity());
                     billProduct.setName(productBillDTO.getProductName());
                     billProduct.setDiscount(productBillDTO.getDiscount());
-
                     billProductList.add(billProduct);
                 }
                 billProductRepository.saveAll(billProductList);
@@ -966,7 +999,7 @@ public class BillService implements IBillService {
                     for (OtherProductDTO productDTO : addBillDTO.getOtherProductsDTOList()) {
                         BillProduct billProduct = new BillProduct();
                         billProduct.setBillId(bill.getId());
-                        billProduct.setProductId(999999);
+                        billProduct.setProductId(null);
                         billProduct.setPrice(Double.valueOf(productDTO.getPrice()));
                         billProduct.setName(productDTO.getProductName());
                         billProduct.setQuantity(productDTO.getQuantity());

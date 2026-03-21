@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -37,6 +38,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(new ReturnObject("Invalid JWT token", null, 0, false));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ReturnObject> handleResponseStatus(ResponseStatusException ex,
+                                                              HttpServletRequest request) {
+        log.warn("[AUTH ERROR] {} {} | {}", request.getMethod(), request.getRequestURI(), ex.getReason());
+        return ResponseEntity
+                .status(ex.getStatus())
+                .body(new ReturnObject(ex.getReason(), null, 0, false));
     }
 
     @ExceptionHandler(Exception.class)

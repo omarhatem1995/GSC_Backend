@@ -1,5 +1,6 @@
 package com.gsc.gsc.user.dto;
 
+import com.gsc.gsc.model.AdminPermission;
 import com.gsc.gsc.model.User;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,6 +20,7 @@ public class LoginResponseDTO implements Serializable {
     private  Integer points;
     private  Integer accountType;
     private Boolean isVerified;
+    private AdminPermission permissions;
 
 
 //    private Boolean isVerified;

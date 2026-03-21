@@ -1,7 +1,10 @@
 package com.gsc.gsc.admin.controller;
 
 import com.gsc.gsc.admin.dto.ActivateCarDTO;
+import com.gsc.gsc.admin.dto.AdminPermissionDTO;
+import com.gsc.gsc.admin.dto.CreateAdminDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
+import com.gsc.gsc.admin.service.serviceImplementation.AdminPermissionService;
 import com.gsc.gsc.admin.service.serviceImplementation.AdminService;
 import com.gsc.gsc.bill.dto.AddBillDTO;
 import com.gsc.gsc.bill.dto.UpdateBillStatusDTO;
@@ -11,7 +14,6 @@ import com.gsc.gsc.car.service.serviceImplementation.CarService;
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.job_cards.dto.JobCardsDTO;
 import com.gsc.gsc.job_cards.service.serviceImplementation.JobCardService;
-import com.gsc.gsc.store.service.serviceImplementation.StoreService;
 import com.gsc.gsc.user.dto.LoginDTO;
 import com.gsc.gsc.user.security.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,11 +39,11 @@ public class AdminController {
     @Autowired
     AdminService adminService;
     @Autowired
+    AdminPermissionService adminPermissionService;
+    @Autowired
     JobCardService jobCardService;
     @Autowired
     CarService carService;
-    @Autowired
-    StoreService storeService;
     @Autowired
     BillService billService;
     @Autowired
@@ -52,6 +54,13 @@ public class AdminController {
     public ResponseEntity<?> loginUser(@RequestBody LoginDTO loginRequestBody
             , HttpServletResponse httpRes) {
         return adminService.adminLogin(loginRequestBody,httpRes);
+    }
+
+    @PostMapping("create")
+    public ResponseEntity<?> createAdmin(
+            @RequestHeader("Authorization") String token,
+            @RequestBody CreateAdminDTO dto) {
+        return adminService.createAdmin(token, dto);
     }
 
     @PostMapping("activate_car")
@@ -193,6 +202,31 @@ public class AdminController {
                                            @PathVariable Integer userId,
                                            @RequestBody CarDTO carDTO) {
         return carService.addCarByAdmin(token, userId, carDTO);
+    }
+
+    // ─── Admin Permission Management (super admin only) ───────────────────────
+
+    @PutMapping("permissions/{adminId}")
+    public ResponseEntity<?> setAdminPermissions(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer adminId,
+            @RequestBody AdminPermissionDTO dto) {
+        return adminPermissionService.setPermissions(token, adminId, dto);
+    }
+
+    @GetMapping("permissions/{adminId}")
+    public ResponseEntity<?> getAdminPermissions(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer adminId) {
+        return adminPermissionService.getPermissions(token, adminId);
+    }
+
+    @PostMapping("permissions/{adminId}/resetPoints/{userId}")
+    public ResponseEntity<?> resetAdminPointsLimit(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer adminId,
+            @PathVariable Integer userId) {
+        return adminPermissionService.resetPointsLimit(token, adminId, userId);
     }
 
 }

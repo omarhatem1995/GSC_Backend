@@ -54,16 +54,11 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     long count();
     @Query("SELECT new com.gsc.gsc.product.dto.GetProductsDTO(" +
-            "p.id, p.code, pi.url,p.price, " +
+            "p.id, p.code, pi.url, p.price, " +
             "CASE WHEN :langId = 1 THEN p.nameEn ELSE p.nameAr END," +
             "CASE WHEN :langId = 1 THEN p.descriptionEn ELSE p.descriptionAr END) " +
             "FROM Product p " +
-            "LEFT JOIN ProductImages pi ON p.id = pi.productId AND pi.counter = 1 " +
-            "WHERE p.id IN (" +
-            "   SELECT DISTINCT p1.id " +
-            "   FROM Product p1 " +
-            "   WHERE p1.id <> 999999" +
-            ")")
+            "LEFT JOIN ProductImages pi ON p.id = pi.productId AND pi.counter = 1")
     Page<GetProductsDTO> findProducts2(@Param("langId") Integer langId, Pageable pageable);
     @Query("SELECT new com.gsc.gsc.inventory.dto.ProductWithSellerBrandDTO(" +
             "p.id, p.code, p.nameEn, p.nameAr, p.descriptionEn , p.descriptionAr , " +

@@ -20,7 +20,7 @@ public class ProductDetailsDTO {
 
     private List<CompatibleVehiclesDTO> compatibleVehicles;
     private List<String> oeNumbers;
-    private List<ProductManufacturerDTO> stores;
+    private List<ProductManufacturerDTO> manufacturers;
 
     // Getters and setters
 }

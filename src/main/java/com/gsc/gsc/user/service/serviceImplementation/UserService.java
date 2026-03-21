@@ -10,6 +10,7 @@ import com.gsc.gsc.user.dto.*;
 import com.gsc.gsc.user.security.AuthenticationService;
 import com.gsc.gsc.user.security.util.JwtUtil;
 import com.gsc.gsc.user.service.serviceInterface.IUserService;
+import com.gsc.gsc.vonage.service.VonageSmsService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,6 +42,12 @@ public class UserService implements IUserService {
     private UserRepository userRepository;
     @Autowired
     private EmailService emailService;
+    @Autowired
+    private VonageSmsService vonageSmsService;
+    @Value("${otp.sms.enabled:false}")
+    private boolean smsEnabled;
+    @Value("${otp.email.enabled:true}")
+    private boolean emailEnabled;
     @Autowired
     private AuthenticationService authenticationService;
     @Autowired
@@ -116,9 +123,17 @@ public class UserService implements IUserService {
         }*/
         if(userOptional.isPresent()) {
             User user = userOptional.get();
+            if (!isOtpOnCooldown(user)) {
+                returnObject.setData(null);
+                returnObject.setStatus(false);
+                returnObject.setMessage("OTP has expired, please request a new one");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+            }
             if(user.getVerificationOTP().trim().equals(userDTO.getVerificationOTP().trim())) {
                 user.setIsVerified(true);
                 user.setIsActive(1);
+                user.setVerificationOTP(null);
+                user.setOtpCreatedAt(null);
                 userRepository.save(user);
                 returnObject.setData(user);
                 returnObject.setStatus(true);
@@ -144,9 +159,22 @@ public class UserService implements IUserService {
         user.setIsActive(1);
         userRepository.save(user);
     }
+    private static final long OTP_VALIDITY_MINUTES = 3;
+
     private String generateOtp() {
-        // Generate a 6-digit OTP
-        return String.valueOf((int)(Math.random() * 900000) + 100000);
+        return String.valueOf(ThreadLocalRandom.current().nextInt(100000, 1000000));
+    }
+
+    private boolean isOtpOnCooldown(User user) {
+        if (user.getOtpCreatedAt() == null) return false;
+        return LocalDateTime.now().isBefore(
+                user.getOtpCreatedAt().toLocalDateTime().plusMinutes(OTP_VALIDITY_MINUTES));
+    }
+
+    private long remainingCooldownSeconds(User user) {
+        if (user.getOtpCreatedAt() == null) return 0;
+        LocalDateTime cooldownEnd = user.getOtpCreatedAt().toLocalDateTime().plusMinutes(OTP_VALIDITY_MINUTES);
+        return java.time.Duration.between(LocalDateTime.now(), cooldownEnd).getSeconds();
     }
     public static String cleanMobileNumber(String phoneNumber) {
         if (phoneNumber.startsWith("+2")) {
@@ -173,10 +201,18 @@ public class UserService implements IUserService {
         }*/
         User userExists = userRepository.findByPhone(userDTO.getPhone());
         if(userExists != null) {
+            if (isOtpOnCooldown(userExists)) {
+                returnObject.setStatus(false);
+                returnObject.setMessage("Please wait " + remainingCooldownSeconds(userExists) + " seconds before requesting a new code");
+                returnObject.setData(null);
+                return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(returnObject);
+            }
             User user = userExists;
             String otp = generateOtp();
             user.setVerificationOTP(otp);
-//            emailService.sendOtpEmail(user.getMail(), otp);
+            user.setOtpCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+            if (emailEnabled) emailService.sendOtpEmail(user.getMail(), otp);
+            if (smsEnabled)   vonageSmsService.sendOtpSms(user.getPhone(), otp);
             user = userRepository.save(user);
             userDTO.setId(user.getId());
         }
@@ -231,7 +267,9 @@ public class UserService implements IUserService {
             user.setPassword(password);
             String otp = generateOtp();
             user.setVerificationOTP(otp);
-            emailService.sendOtpEmail(user.getMail(),otp);
+            user.setOtpCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+            if (emailEnabled) emailService.sendOtpEmail(user.getMail(), otp);
+            if (smsEnabled)   vonageSmsService.sendOtpSms(user.getPhone(), otp);
             user = userRepository.save(user);
             userDTO.setId(user.getId());
             userDTO.setToken(jwtTokenUtil.generateToken(user.getId(),USER_TYPE,tokenExpiryTime));
@@ -258,8 +296,14 @@ public class UserService implements IUserService {
         }
         if(user != null) {
             if (dto.getNewPassword() != null) {
-                String newPassword = bCryptPasswordEncoder.encode(dto.getNewPassword());
-                user.setPassword(newPassword);
+                // Old password is required when changing password
+                if (dto.getPassword() == null || !bCryptPasswordEncoder.matches(dto.getPassword(), user.getPassword())) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Old password is incorrect");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                }
+                user.setPassword(bCryptPasswordEncoder.encode(dto.getNewPassword()));
             }
             updateUserFields(user, dto);
             User updatedUser = userRepository.save(user);

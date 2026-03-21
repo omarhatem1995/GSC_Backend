@@ -2,6 +2,7 @@ package com.gsc.gsc.admin.service.serviceImplementation;
 
 import com.google.api.Http;
 import com.gsc.gsc.admin.dto.ActivateCarDTO;
+import com.gsc.gsc.admin.dto.CreateAdminDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
 import com.gsc.gsc.admin.service.serviceInterface.IAdminService;
 import com.gsc.gsc.car.dto.CarDTO;
@@ -42,6 +43,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.gsc.gsc.admin.service.serviceImplementation.AdminPermissionService;
+import com.gsc.gsc.repo.AdminPermissionRepository;
+import com.gsc.gsc.user.dto.LoginResponseDTO;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import static com.gsc.gsc.constants.NotificationTypes.ADMIN;
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 import static com.gsc.gsc.user.service.serviceImplementation.UserService.cleanMobileNumber;
@@ -69,9 +74,16 @@ public class AdminService implements IAdminService {
     private ModelRepository modelRepository;
     @Autowired
     private PointRepository pointRepository;
+    @Autowired
+    private AdminPermissionService adminPermissionService;
+    @Autowired
+    private AdminPermissionRepository adminPermissionRepository;
 
     @Autowired
     private AuthenticationService authenticationService;
+
+    private final BCryptPasswordEncoder bCryptPasswordEncoder = new BCryptPasswordEncoder();
+
     public ResponseEntity<?> adminLogin(LoginDTO loginDTO, HttpServletResponse httpRes) {
 
         ReturnObject returnObject = new ReturnObject();
@@ -91,11 +103,23 @@ public class AdminService implements IAdminService {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
 
-        return authenticationService.login(
+        ResponseEntity<?> loginResponse = authenticationService.login(
                 loginDTO.getPhone(),
                 loginDTO.getPassword(),
                 httpRes
         );
+
+        // If login succeeded, inject the admin's permissions into the response
+        if (loginResponse.getStatusCode() == HttpStatus.OK && loginResponse.getBody() instanceof ReturnObject) {
+            ReturnObject body = (ReturnObject) loginResponse.getBody();
+            if (body.getData() instanceof LoginResponseDTO) {
+                LoginResponseDTO loginResponseDTO = (LoginResponseDTO) body.getData();
+                adminPermissionRepository.findByAdminId(loginResponseDTO.getId())
+                        .ifPresent(loginResponseDTO::setPermissions);
+            }
+        }
+
+        return loginResponse;
     }
     @Override
     public Optional<Car> getById(Integer id) {
@@ -283,6 +307,12 @@ public class AdminService implements IAdminService {
             returnObject.setData(null);
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
+        if (!adminPermissionService.canSendNotifications(userId)) {
+            returnObject.setMessage("You do not have permission to send notifications");
+            returnObject.setStatus(false);
+            returnObject.setData(null);
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
 
         // Build target user list based on targetType
         List<User> targetUsers = new ArrayList<>();
@@ -426,6 +456,57 @@ public class AdminService implements IAdminService {
         returnObject.setMessage("Can't change user status with non admin user");
         returnObject.setData(null);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+    }
+
+    public ResponseEntity<?> createAdmin(String token, CreateAdminDTO dto) {
+        ReturnObject returnObject = new ReturnObject();
+        Integer requesterId = userService.getUserIdFromToken(token);
+
+        if (!adminPermissionService.isSuperAdmin(requesterId)) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Only super admins can create admin accounts");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        if (dto.getPhone() == null || dto.getPhone().isBlank()) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Phone number is required");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+        }
+
+        if (dto.getPassword() == null || dto.getPassword().isBlank()) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Password is required");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+        }
+
+        String cleanPhone = cleanMobileNumber(dto.getPhone());
+
+        User existing = userRepository.findByPhone(cleanPhone);
+        if (existing != null) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("A user with this phone number already exists");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(returnObject);
+        }
+
+        User admin = new User();
+        admin.setName(dto.getName());
+        admin.setPhone(cleanPhone);
+        admin.setMail(dto.getMail());
+        admin.setPassword(bCryptPasswordEncoder.encode(dto.getPassword()));
+        admin.setAccountTypeId(ADMIN_TYPE);
+        admin.setIsVerified(true);
+        admin.setIsActive(1);
+
+        User saved = userRepository.save(admin);
+
+        // Don't return the hashed password
+        saved.setPassword(null);
+
+        returnObject.setStatus(true);
+        returnObject.setMessage("Admin created successfully");
+        returnObject.setData(saved);
+        return ResponseEntity.ok(returnObject);
     }
 
 }

@@ -35,10 +35,6 @@ public class ProductController {
                                         @PathVariable Integer productId) {
         return productService.update(token, productId,productDTO );
     }
-    @GetMapping("admin/store/{id}")
-    public ResponseEntity getProductsForStore(@RequestHeader("Authorization") String token ,@PathVariable Integer id) {
-        return productService.findProductsForStoreId(token,id);
-    }
     @PostMapping("products")
     public ResponseEntity getProductsWithCount(@RequestHeader("Authorization") String token,
                                       @RequestHeader("Accept-Language") String langId,

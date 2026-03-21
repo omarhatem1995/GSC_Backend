@@ -12,6 +12,7 @@ import com.gsc.gsc.user.dto.LoginResponseDTO;
 import com.gsc.gsc.user.dto.PointsDTO;
 import com.gsc.gsc.user.security.util.JwtUtil;
 import com.gsc.gsc.user.security.util.MyUserDetails;
+import com.gsc.gsc.vonage.service.VonageSmsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -25,8 +26,10 @@ import org.springframework.stereotype.Service;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletResponse;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
 import static com.gsc.gsc.constants.UserTypes.NOT_VERIFIED_USER;
@@ -44,6 +47,12 @@ public class AuthenticationService implements UserDetailsService {
     PointRepository pointRepository;
     @Autowired
     EmailService emailService;
+    @Autowired
+    VonageSmsService vonageSmsService;
+    @Value("${otp.sms.enabled:false}")
+    private boolean smsEnabled;
+    @Value("${otp.email.enabled:true}")
+    private boolean emailEnabled;
 
     @Autowired
     private JwtUtil jwtTokenUtil;
@@ -119,20 +128,40 @@ public class AuthenticationService implements UserDetailsService {
             returnObject.setData(loginResponseDTO);
             return new ResponseEntity<>(returnObject, HttpStatus.OK);
         }else{
-            String otp = generateOtp();
             ReturnObject returnObject = new ReturnObject();
+            returnObject.setId(NOT_VERIFIED_USER);
+            if (isOtpOnCooldown(user)) {
+                returnObject.setMessage("User Not Verified. Please wait " + remainingCooldownSeconds(user) + " seconds before requesting a new code");
+                returnObject.setData(null);
+                return new ResponseEntity<>(returnObject, HttpStatus.FORBIDDEN);
+            }
+            String otp = generateOtp();
             returnObject.setMessage("User Not Verified");
             returnObject.setData(null);
-            returnObject.setId(NOT_VERIFIED_USER);
-            emailService.sendOtpEmail(loginResponseDTO.getMail(),otp);
+            if (emailEnabled) emailService.sendOtpEmail(loginResponseDTO.getMail(), otp);
+            if (smsEnabled)   vonageSmsService.sendOtpSms(user.getPhone(), otp);
             user.setVerificationOTP(otp);
+            user.setOtpCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
             userRepository.save(user);
             return new ResponseEntity<>(returnObject, HttpStatus.FORBIDDEN);
         }
     }
+    private static final long OTP_VALIDITY_MINUTES = 3;
+
     private String generateOtp() {
-        // Generate a 6-digit OTP
-        return String.valueOf((int)(Math.random() * 900000) + 100000);
+        return String.valueOf(ThreadLocalRandom.current().nextInt(100000, 1000000));
+    }
+
+    private boolean isOtpOnCooldown(User user) {
+        if (user.getOtpCreatedAt() == null) return false;
+        return LocalDateTime.now().isBefore(
+                user.getOtpCreatedAt().toLocalDateTime().plusMinutes(OTP_VALIDITY_MINUTES));
+    }
+
+    private long remainingCooldownSeconds(User user) {
+        if (user.getOtpCreatedAt() == null) return 0;
+        LocalDateTime cooldownEnd = user.getOtpCreatedAt().toLocalDateTime().plusMinutes(OTP_VALIDITY_MINUTES);
+        return java.time.Duration.between(LocalDateTime.now(), cooldownEnd).getSeconds();
     }
     protected void addCookie(String token,
                              HttpServletResponse httpRes,

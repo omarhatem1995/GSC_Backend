@@ -1,10 +1,12 @@
 package com.gsc.gsc.configurations.service.serviceImplementation;
 
+import com.gsc.gsc.admin.service.serviceImplementation.AdminPermissionService;
 import com.gsc.gsc.configurations.dto.*;
 import com.gsc.gsc.configurations.dto.vehicle.CreateVehicleDTO;
 import com.gsc.gsc.configurations.dto.vehicle.UpdateVehicleDTO;
 import com.gsc.gsc.configurations.dto.vehicle.VehicleModelDTO;
 import com.gsc.gsc.configurations.dto.vehicle.VehicleTableDTO;
+import com.gsc.gsc.repo.FeaturedBrandRepository;
 import com.gsc.gsc.constants.ReturnObject;
 import com.gsc.gsc.constants.ReturnObjectPaging;
 import com.gsc.gsc.model.*;
@@ -47,6 +49,11 @@ public class ConfigurationService {
     private UserRepository userRepository;
     @Autowired
     private ImgBBService imgBBService;
+    @Autowired
+    private FeaturedBrandRepository featuredBrandRepository;
+    @Autowired
+    private AdminPermissionService adminPermissionService;
+
     public ResponseEntity<?> getVehicleById(Integer brandId) {
         ReturnObject returnObject = new ReturnObject();
 
@@ -202,6 +209,12 @@ public class ConfigurationService {
         User user = userRepository.findUserById(userId);
         if (user != null) {
             if (user.getAccountTypeId() == ADMIN_TYPE){
+                if (!adminPermissionService.canManageSellerBrands(userId)) {
+                    returnObject.setMessage("You do not have permission to manage seller brands");
+                    returnObject.setStatus(false);
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+                }
                 String imageUrl;
                 try {
                     imageUrl = imgBBService.uploadImage(createManufacturerDTO.getImage());
@@ -248,6 +261,12 @@ public class ConfigurationService {
         User user = userRepository.findUserById(userId);
         if (user != null) {
             if (user.getAccountTypeId() == ADMIN_TYPE) {
+                if (!adminPermissionService.canAddVehicles(userId)) {
+                    returnObject.setMessage("You do not have permission to add vehicles");
+                    returnObject.setStatus(false);
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+                }
                 if (brandRepository.existsByCode(createVehicleDTO.getCode())) {
                     returnObject.setStatus(false);
                     returnObject.setMessage("Brand with this code already exists");
@@ -318,6 +337,12 @@ public class ConfigurationService {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
         }
 
+        if (!adminPermissionService.canAddVehicles(userId) && !adminPermissionService.canAddModels(userId)) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("You do not have permission to update vehicles or models");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
         Optional<Brand> brandOptional = brandRepository.findById(brandId);
         if (!brandOptional.isPresent()) {
             returnObject.setStatus(false);
@@ -368,6 +393,84 @@ public class ConfigurationService {
         returnObject.setStatus(true);
         returnObject.setMessage("Updated Successfully");
         returnObject.setData(brand);
+        return ResponseEntity.ok(returnObject);
+    }
+
+    public ResponseEntity<?> setFeaturedBrands(String token, List<FeaturedBrandRequest> requests) {
+        ReturnObject returnObject = new ReturnObject();
+
+        Integer userId = userService.getUserIdFromToken(token);
+        User admin = userRepository.findUserById(userId);
+        if (admin == null || admin.getAccountTypeId() != ADMIN_TYPE) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Unauthorized");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+        if (!adminPermissionService.canManageFeaturedBrands(userId)) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("You do not have permission to manage featured brands");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        if (requests == null || requests.isEmpty() || requests.size() > 4) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Featured brands list must have between 1 and 4 entries");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+        }
+
+        // Validate all sellerBrandIds exist
+        for (FeaturedBrandRequest req : requests) {
+            if (!sellerBrandRepository.existsById(req.getSellerBrandId())) {
+                returnObject.setStatus(false);
+                returnObject.setMessage("Seller brand not found: " + req.getSellerBrandId());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+            }
+        }
+
+        // Replace all current featured brands
+        featuredBrandRepository.deleteAll();
+        List<FeaturedBrand> saved = new ArrayList<>();
+        for (FeaturedBrandRequest req : requests) {
+            FeaturedBrand fb = new FeaturedBrand();
+            fb.setSellerBrandId(req.getSellerBrandId());
+            fb.setDisplayOrder(req.getDisplayOrder());
+            fb.setChangedBy(userId);
+            saved.add(featuredBrandRepository.save(fb));
+        }
+
+        returnObject.setStatus(true);
+        returnObject.setMessage("Featured brands updated successfully");
+        returnObject.setData(saved);
+        return ResponseEntity.ok(returnObject);
+    }
+
+    public ResponseEntity<?> getFeaturedBrands() {
+        ReturnObject returnObject = new ReturnObject();
+
+        List<FeaturedBrand> featuredList = featuredBrandRepository.findAllByOrderByDisplayOrderAsc();
+
+        List<FeaturedBrandResponseDTO> result = new ArrayList<>();
+        for (FeaturedBrand fb : featuredList) {
+            Optional<SellerBrand> sellerBrandOptional = sellerBrandRepository.findById(fb.getSellerBrandId());
+            if (sellerBrandOptional.isPresent()) {
+                SellerBrand sb = sellerBrandOptional.get();
+                FeaturedBrandResponseDTO dto = new FeaturedBrandResponseDTO(
+                        sb.getId(),
+                        fb.getDisplayOrder(),
+                        sb.getNameEn(),
+                        sb.getNameAr(),
+                        sb.getDescriptionEn(),
+                        sb.getDescriptionAr(),
+                        sb.getImageUrl(),
+                        sb.getCode()
+                );
+                result.add(dto);
+            }
+        }
+
+        returnObject.setStatus(true);
+        returnObject.setMessage("Loaded successfully");
+        returnObject.setData(result);
         return ResponseEntity.ok(returnObject);
     }
 }

@@ -65,6 +65,8 @@ public class User {
     private String address;
     @Column(name = "verification_otp")
     private String verificationOTP;
+    @Column(name = "otp_created_at")
+    private Timestamp otpCreatedAt;
     @Basic
     @Column(name = "created_at")
     private Timestamp createdAt;

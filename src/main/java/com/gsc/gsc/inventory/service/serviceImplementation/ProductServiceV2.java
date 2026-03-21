@@ -39,8 +39,6 @@ public class ProductServiceV2 {
     @Autowired
     private ProductRepository productRepository;
     @Autowired
-    private StoreRepository storeRepository;
-    @Autowired
     private ModelRepository modelRepository;
     @Autowired
     private BrandRepository brandRepository;
@@ -48,8 +46,6 @@ public class ProductServiceV2 {
     private SellerBrandRepository sellerBrandRepository;
     @Autowired
     private ProductBrandSellerBrandRepository productBrandSellerBrandRepository;
-    @Autowired
-    private StoreProductBrandSellerBrandRepository storeProductBrandSellerBrandRepository;
     @Autowired
     private POENumberRepository pOENumberRepository;
     @Autowired
@@ -87,22 +83,6 @@ public class ProductServiceV2 {
              * Create Product In Inventory
              */
             ProductModelSellerBrand productModelSellerBrand = createProductInInventory(userId,dto);
-
-            /*
-            * Adding Store is Optional
-            * */
-            Optional<Store> storeOptional = storeRepository.findById(dto.getStoreId());
-//            if(storeOptional.isPresent()){
-//                /*
-//                * Update productBrandSellerBrand with the storeProductBrandSellerBrand "ID"
-//                * */
-//
-//                StoreProductBrandSellerBrand storeProductBrandSellerBrand = new StoreProductBrandSellerBrand();
-//                storeProductBrandSellerBrand.setStoreId(storeOptional.get().getId());
-//                storeProductBrandSellerBrand.setProductBrandSellerBrandId(productModelSellerBrand.getId());
-//                storeProductBrandSellerBrand.setCreatedById(userId);
-//                storeProductBrandSellerBrandRepository.save(storeProductBrandSellerBrand);
-//            }
 
             /*
             * Map Data to GetProductDTO
@@ -167,22 +147,6 @@ public class ProductServiceV2 {
              * Create Product In Inventory
              */
             ProductModelSellerBrand productModelSellerBrand = createProductInInventory(userId,dto);
-
-            /*
-            * Adding Store is Optional
-            * */
-            Optional<Store> storeOptional = storeRepository.findById(dto.getStoreId());
-//            if(storeOptional.isPresent()){
-//                /*
-//                * Update productBrandSellerBrand with the storeProductBrandSellerBrand "ID"
-//                * */
-//
-//                StoreProductBrandSellerBrand storeProductBrandSellerBrand = new StoreProductBrandSellerBrand();
-//                storeProductBrandSellerBrand.setStoreId(storeOptional.get().getId());
-//                storeProductBrandSellerBrand.setProductBrandSellerBrandId(productModelSellerBrand.getId());
-//                storeProductBrandSellerBrand.setCreatedById(userId);
-//                storeProductBrandSellerBrandRepository.save(storeProductBrandSellerBrand);
-//            }
 
             /*
             * Map Data to GetProductDTO
