@@ -13,19 +13,17 @@ import java.util.List;
 public class CreateProductRequest {
 
     private String code;
-    private String nameEn;
-    private String nameAr;
-
-    private String descriptionEn;
-    private String descriptionAr;
-
+    private String productNameEn;
+    private String productNameAr;
+    private String productDescriptionEn;
+    private String productDescriptionAr;
     private Double price;
     private Double cost;
-
+    private Integer discountId;
+    private Integer promoId;
     private MultipartFile image;
-
     private List<ManufacturerRequest> manufacturers;
-    private List<String> oeNumbers;
+    private List<String> oeNumber;
     private List<VehicleCompatibilityRequest> vehicles;
 
 }

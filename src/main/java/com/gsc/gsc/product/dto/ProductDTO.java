@@ -25,4 +25,6 @@ public class ProductDTO {
     String productDescriptionEn;
     String productDescriptionAr;
     MultipartFile image;
+    List<ManufacturerRequest> manufacturers;
+    List<VehicleCompatibilityRequest> vehicles;
 }

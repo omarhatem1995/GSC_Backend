@@ -78,7 +78,7 @@ public class JobCardPdfGeneratorITextService {
 
     // ===================== CONSTANTS =====================
 
-    private static final Map<Integer, String> ACCOUNT_TYPE_MAP = Map.of(1, "User", 2, "Business", 3, "Admin");
+    private static final Map<Integer, String> ACCOUNT_TYPE_MAP = Map.of(1, "Personal", 2, "Business", 3, "Admin");
     private static final Color HEADER_BG_COLOR = new DeviceRgb(230, 230, 230);
     private static final float IMG_CELL_WIDTH  = 165f;
     private static final float IMG_CELL_HEIGHT = 130f;
@@ -221,11 +221,14 @@ public class JobCardPdfGeneratorITextService {
     }
 
     private String[] resolveCreatedByInfo(JobCardProduct product, User user, String userName) {
-        String createdBy = "Admin";
+        String createdBy = "Unknown";
         String approvedByCustomerAt = "Not Yet";
-        if (user != null && product.getCreatedBy() != null) {
-            if (product.getCreatedBy().equals(user.getId())) {
-                createdBy = userName;
+        if (product.getCreatedBy() != null) {
+            User addedByUser = userRepository.findUserById(product.getCreatedBy());
+            if (addedByUser != null && addedByUser.getName() != null) {
+                createdBy = addedByUser.getName();
+            }
+            if (user != null && product.getCreatedBy().equals(user.getId())) {
                 approvedByCustomerAt = "Customer Added it";
             } else if (product.getCustomerApprovedAt() != null) {
                 approvedByCustomerAt = product.getCustomerApprovedAt().toString();
@@ -263,7 +266,6 @@ public class JobCardPdfGeneratorITextService {
                                      JobCard jobCard, User user, String userName, PdfFont arabicFont) {
         // 5 columns: Product | QTY | PRICE | Added By | Approved By Customer At
         Table productsTable = new Table(new float[]{200f, 150f, 150f, 150f, 150f});
-        BigDecimal totalPrice = BigDecimal.ZERO;
 
         productsTable.addCell(new Cell().add("Product").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
         productsTable.addCell(new Cell().add("QTY").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
@@ -277,23 +279,17 @@ public class JobCardPdfGeneratorITextService {
                 String productPrice    = product.getPrice() != null ? product.getPrice() : "0";
                 String productQuantity = product.getQuantity() != null ? String.valueOf(product.getQuantity()) : "0";
 
-                try {
-                    totalPrice = totalPrice.add(new BigDecimal(productPrice).multiply(new BigDecimal(product.getQuantity())));
-                } catch (Exception e) {
-                    System.out.println("Error calculating total: " + e.getMessage());
-                }
-
                 product.setName(productName);
                 String[] createdByInfo = resolveCreatedByInfo(product, user, userName);
                 addProductWithLanguage(productsTable, arabicFont, product, createdByInfo[0], createdByInfo[1], productQuantity, productPrice);
             }
         }
 
-        addSummaryRows(productsTable, jobCard, totalPrice);
+        addSummaryRows(productsTable, jobCard);
         return productsTable;
     }
 
-    private void addSummaryRows(Table productsTable, JobCard jobCard, BigDecimal totalPrice) {
+    private void addSummaryRows(Table productsTable, JobCard jobCard) {
         // 5-column table: [empty x1] [label spans 3] [value] — flush to right edge
 
         // Down payment row
@@ -304,11 +300,12 @@ public class JobCardPdfGeneratorITextService {
         productsTable.addCell(new Cell().add(new Paragraph(downPayment))
                 .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
 
-        // Total row
+        // Total row — taken directly from the stored price in DB
+        String total = jobCard.getPrice() != null ? jobCard.getPrice().toString() : "0";
         productsTable.addCell(new Cell(1, 1).setBorder(Border.NO_BORDER));
         productsTable.addCell(new Cell(1, 3).add(new Paragraph("Total").setBold())
                 .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
-        productsTable.addCell(new Cell().add(new Paragraph(totalPrice.toString()).setBold())
+        productsTable.addCell(new Cell().add(new Paragraph(total).setBold())
                 .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
     }
 
@@ -518,7 +515,7 @@ public class JobCardPdfGeneratorITextService {
         customerTable.setWidth(UnitValue.createPercentValue(100));
 
         customerTable.addCell(createCell("No.", true));
-        customerTable.addCell(createCell(String.valueOf(jobCard.getId()), false));
+        customerTable.addCell(createCell(jobCard.getCode() != null ? jobCard.getCode() : String.valueOf(jobCard.getId()), false));
         customerTable.addCell(createCell("Date:", true));
         customerTable.addCell(createCell(jobCard.getCreatedAt() != null ? jobCard.getCreatedAt().toString() : "", false));
 
@@ -567,23 +564,38 @@ public class JobCardPdfGeneratorITextService {
         }
 
         String createdBy = "Admin";
-        String approvedByCustomerAt = "Not Yet";
-        String approvedByCustomersDevice = "Not Yet";
-        if (user != null) {
-            if (accountType.equals(USER_TYPE)) {
-                createdBy = userName;
-                if (note.getCustomerMobileVersion() != null) {
-                    Timestamp approvedAt = note.getApprovedByCustomerAt();
+        String approvedByCustomerAt;
+        String approvedByCustomersDevice;
+
+        // Private notes don't require customer approval — mark those columns as N/A
+        if (Boolean.TRUE.equals(note.getIsPrivate())) {
+            approvedByCustomerAt = "N/A";
+            approvedByCustomersDevice = "N/A";
+        } else {
+            approvedByCustomerAt = "Not Yet";
+            approvedByCustomersDevice = "Not Yet";
+            if (user != null) {
+                if (accountType.equals(USER_TYPE)) {
+                    // Note was created by the customer — label it and treat it as self-approved
+                    createdBy = "Created by customer";
                     SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
-                    approvedByCustomerAt = sdf.format(approvedAt);
-                    approvedByCustomersDevice = note.getCustomerMobileVersion();
-                }
-            } else {
-                if (note.getApprovedByCustomerAt() != null) {
-                    Timestamp approvedAt = note.getApprovedByCustomerAt();
-                    SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
-                    approvedByCustomerAt = sdf.format(approvedAt);
-                    approvedByCustomersDevice = note.getCustomerMobileVersion();
+                    if (note.getCustomerMobileVersion() != null) {
+                        approvedByCustomersDevice = note.getCustomerMobileVersion();
+                    } else {
+                        approvedByCustomersDevice = "Customer";
+                    }
+                    // Use approvedByCustomerAt if set, otherwise fall back to createdAt
+                    Timestamp approvedAt = note.getApprovedByCustomerAt() != null
+                            ? note.getApprovedByCustomerAt()
+                            : note.getCreatedAt();
+                    approvedByCustomerAt = approvedAt != null ? sdf.format(approvedAt) : "Customer Created";
+                } else {
+                    if (note.getApprovedByCustomerAt() != null) {
+                        Timestamp approvedAt = note.getApprovedByCustomerAt();
+                        SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
+                        approvedByCustomerAt = sdf.format(approvedAt);
+                        approvedByCustomersDevice = note.getCustomerMobileVersion();
+                    }
                 }
             }
         }

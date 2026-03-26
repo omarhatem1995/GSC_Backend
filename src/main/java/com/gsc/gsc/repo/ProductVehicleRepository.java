@@ -8,4 +8,5 @@ import java.util.List;
 public interface ProductVehicleRepository extends JpaRepository<ProductVehicle, Integer> {
 
     List<ProductVehicle> findAllByProductId(Integer productId);
+    void deleteAllByProductId(Integer productId);
 }

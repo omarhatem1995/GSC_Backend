@@ -306,10 +306,14 @@ public class BillPdfGeneratorITextService {
         Table productsTable = new Table(new float[]{200f, 100f, 100f, 100f, 150f, 150f});
         BigDecimal totalPrice = BigDecimal.ZERO;
 
+        // Determine whether product-level discounts are QAR values ("V") or percentages ("P"/null)
+        boolean productDiscountIsValue = "V".equals(bill.getDiscountType());
+        String discountColumnHeader = productDiscountIsValue ? "Discount (QAR)" : "Discount %";
+
         productsTable.addCell(new Cell().add("Product").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
         productsTable.addCell(new Cell().add("QTY").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
         productsTable.addCell(new Cell().add("PRICE").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
-        productsTable.addCell(new Cell().add("Discount %").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
+        productsTable.addCell(new Cell().add(discountColumnHeader).setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
         productsTable.addCell(new Cell().add("Added By").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
         productsTable.addCell(new Cell().add("Approved By Customer At").setBold().setFontSize(14f).setBorderBottom(new SolidBorder(1)));
 
@@ -328,8 +332,10 @@ public class BillPdfGeneratorITextService {
             }
             if (billProduct.getQuantity() != null) productQuantity = String.valueOf(billProduct.getQuantity());
 
+            // Show product discount as raw QAR value when discountType="V", otherwise with % sign
             String itemDiscount = (billProduct.getDiscount() != null && billProduct.getDiscount() != 0.0)
-                    ? billProduct.getDiscount() + "%" : "-";
+                    ? (productDiscountIsValue ? billProduct.getDiscount().toString() : billProduct.getDiscount() + "%")
+                    : "-";
 
             String[] createdByInfo = resolveCreatedByInfo(billProduct, user, userName);
             billProduct.setName(productName);
@@ -344,13 +350,24 @@ public class BillPdfGeneratorITextService {
         // 6 columns to match the products table
         Table productsTable = new Table(new float[]{200f, 100f, 100f, 100f, 150f, 150f});
 
-        // Discount: show "-" if null or zero; otherwise value + "%"
+        // Discount: show "-" if null or zero; respect discountType ("V"=QAR value, "P"=percentage)
         boolean hasDiscount = bill.getDiscount() != null && bill.getDiscount() != 0.0;
-        String discountDisplay = hasDiscount ? bill.getDiscount() + "%" : "-";
+        String discountDisplay = "-";
+        String discountTypeText = "-";
+        if (hasDiscount) {
+            String discountType = bill.getDiscountType();
+            if (discountType != null && discountType.equals("V")) {
+                discountDisplay = bill.getDiscount().toString();
+                discountTypeText = "Value";
+            } else {
+                discountDisplay = bill.getDiscount() + "%";
+                discountTypeText = "Percentage";
+            }
+        }
 
         // Layout: [empty x2] [label spans 3] [value] — value is flush to the right edge
         productsTable.addCell(new Cell(1, 2).setBorder(Border.NO_BORDER));
-        productsTable.addCell(new Cell(1, 3).add(new Paragraph("Discount").setBold())
+        productsTable.addCell(new Cell(1, 3).add(new Paragraph("Discount (" + discountTypeText + ")").setBold())
                 .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
         productsTable.addCell(new Cell().add(new Paragraph(discountDisplay))
                 .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));

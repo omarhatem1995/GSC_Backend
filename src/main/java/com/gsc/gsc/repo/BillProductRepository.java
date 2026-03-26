@@ -13,4 +13,6 @@ public interface BillProductRepository extends JpaRepository<BillProduct, Intege
 
     @Transactional
     void deleteAllByBillId(Integer billId);
+
+    boolean existsByProductManufacturerId(Integer productManufacturerId);
 }

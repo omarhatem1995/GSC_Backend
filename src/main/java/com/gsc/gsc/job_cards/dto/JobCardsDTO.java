@@ -30,6 +30,7 @@ public class JobCardsDTO {
     private List<String> jobCardsUrl;
     private List<JobCardNotesDTO> jobCardNotes;
     private String jobCardStatus;
+    private String changeStatusTo;
     private List<ProductBillDTO> productBillDTOList;
     private List<OtherProductDTO> otherProductsDTOList;
 }

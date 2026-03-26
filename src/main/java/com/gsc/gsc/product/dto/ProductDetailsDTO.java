@@ -1,4 +1,3 @@
-// ProductDetailsDTO.java
 package com.gsc.gsc.product.dto;
 
 import lombok.AllArgsConstructor;
@@ -21,6 +20,4 @@ public class ProductDetailsDTO {
     private List<CompatibleVehiclesDTO> compatibleVehicles;
     private List<String> oeNumbers;
     private List<ProductManufacturerDTO> manufacturers;
-
-    // Getters and setters
 }

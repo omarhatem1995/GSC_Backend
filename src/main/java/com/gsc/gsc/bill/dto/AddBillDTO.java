@@ -22,7 +22,8 @@ public class AddBillDTO {
     String notes;
     String privateNotes;
     Double discount;
-    String discountType;
+    String discountType = "V";
+    String discountLevel = "INVOICE";   // "PRODUCT" or "INVOICE"
     Double finalTotalPrice;
     String billTypeId;
     String referenceNumber;

@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface ProductManufacturerRepository extends JpaRepository<ProductManufacturer, Integer> {
 
     List<ProductManufacturer> findAllByProductId( Integer productId);
-    @Query("SELECT new com.gsc.gsc.product.dto.ProductManufacturerDTO(pm.id, pm.quantity, pm.price, b.nameEn) " +
+    @Query("SELECT new com.gsc.gsc.product.dto.ProductManufacturerDTO(pm.sellerBrandId, pm.quantity, pm.price, b.nameEn) " +
             "FROM ProductManufacturer pm " +
             "JOIN SellerBrand b ON pm.sellerBrandId = b.id " +
             "WHERE pm.productId = :productId")
@@ -26,4 +26,5 @@ public interface ProductManufacturerRepository extends JpaRepository<ProductManu
     List<ProductPriceDTO> findMinPriceByProductIds(@Param("productIds") List<Integer> productIds);
     Optional<ProductManufacturer> findBySellerBrandIdAndProductId(Integer sellerBrandId, Integer productId);
     Optional<ProductManufacturer> findFirstByProductIdOrderByQuantityAsc(Integer productId);
+    void deleteAllByProductId(Integer productId);
 }

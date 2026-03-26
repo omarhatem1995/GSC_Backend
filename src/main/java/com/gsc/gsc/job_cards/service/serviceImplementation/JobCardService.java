@@ -46,6 +46,8 @@ public class JobCardService {
     @Autowired
     private JobCardProductRepository jobCardProductRepository;
     @Autowired
+    private ProductManufacturerRepository productManufacturerRepository;
+    @Autowired
     private JobCardImagesRepository jobCardImagesRepository;
     @Autowired
     private UserService userService;
@@ -502,7 +504,7 @@ public class JobCardService {
         Optional<List<JobCardProduct>> jobCardProductsOptional = jobCardProductRepository.findAllByJobCardId(jobCardId);
         Optional<JobCard> jobCardOptional = jobCardRepository.findById(jobCardId);
         ReturnObject returnObject = new ReturnObject();
-        if(jobCardOptional.isPresent()) {
+        if (jobCardOptional.isPresent()) {
             JobCard jobCard = jobCardOptional.get();
             JobCardsDTO jobCardsDTO = new JobCardsDTO();
             if (jobCardProductsOptional.isPresent()) {
@@ -512,17 +514,29 @@ public class JobCardService {
                 List<OtherProductDTO> otherProductDTOList = new ArrayList<>();
                 List<JobCardNotesDTO> jobCardNotesDTOList = new ArrayList<>();
                 for (int i = 0; i < jobCardProductList.size(); i++) {
-                    if (jobCardProductList.get(i).getProductId() != null) {
-                        Optional<Product> productOptional = productRepository.findById(jobCardProductList.get(i).getProductId());
+                    JobCardProduct jcp = jobCardProductList.get(i);
+                    if (jcp.getProductId() != null) {
+                        Optional<Product> productOptional = productRepository.findById(jcp.getProductId());
                         if (productOptional.isPresent()) {
                             Product product = productOptional.get();
-
                             String productImageUrl = product.getImageUrl();
-                            productBillDTOList.add(new ProductBillDTO(product.getId(), product.getCode(), product.getPrice(), 0, 0, jobCardProductList.get(i).getQuantity(), product.getId(), productImageUrl, product.getCode(), jobCardProductList.get(i).getCreatedBy()));
-
+                            ProductBillDTO dto = new ProductBillDTO(product.getId(), product.getCode(), Double.parseDouble(jcp.getPrice()), 0, 0, jcp.getQuantity(), product.getId(), productImageUrl, product.getNameEn(), jcp.getCreatedBy());
+                            // Resolve sellerBrandId from the stored manufacturer reference
+                            if (jcp.getManufacturerId() != null) {
+                                Optional<ProductManufacturer> pmOptional = productManufacturerRepository.findById(jcp.getManufacturerId());
+                                if (pmOptional.isPresent()) {
+                                    dto.setSellerBrandId(pmOptional.get().getSellerBrandId());
+                                    System.out.println("[JobCard] manufacturerId=" + jcp.getManufacturerId() + " → sellerBrandId=" + pmOptional.get().getSellerBrandId());
+                                } else {
+                                    System.out.println("[JobCard] manufacturerId=" + jcp.getManufacturerId() + " → NOT FOUND in product_manufacturer");
+                                }
+                            } else {
+                                System.out.println("[JobCard] productId=" + jcp.getProductId() + " has no manufacturerId stored");
+                            }
+                            productBillDTOList.add(dto);
                         }
                     } else {
-                        otherProductDTOList.add(new OtherProductDTO(jobCardProductList.get(i).getId(), jobCardProductList.get(i).getQuantity(), jobCardProductList.get(i).getName(), jobCardProductList.get(i).getPrice(), jobCardProductList.get(i).getCreatedBy()));
+                        otherProductDTOList.add(new OtherProductDTO(jcp.getId(), jcp.getQuantity(), jcp.getName(), jcp.getPrice(), jcp.getCreatedBy()));
                     }
                 }
                 List<JobCardNotes> jobCardNotesList = jobCardNotesRepository.findAllByJobCardId(jobCardId);
@@ -589,7 +603,7 @@ public class JobCardService {
                 returnObject.setData(null);
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
             }
-        }else{
+        } else {
             returnObject.setMessage("Job Card Not found");
             returnObject.setStatus(false);
             returnObject.setData(null);
@@ -637,18 +651,31 @@ public class JobCardService {
                     }
                     jobCardsDTO.setJobCardsUrl(uploadedUrls);
                 }
+                String productValidationError = validateProductBillItems(jobCardsDTO.getProductBillDTOList());
+                if (productValidationError != null) {
+                    ReturnObject returnObject = new ReturnObject();
+                    returnObject.setMessage(productValidationError);
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                }
                 if (jobCardsDTO.getOtherProductsDTOList() != null) {
                     for (int i = 0; i < jobCardsDTO.getOtherProductsDTOList().size(); i++) {
-                        JobCardProduct jobCardProduct = new JobCardProduct(jobCardsDTO.getOtherProductsDTOList().get(i), jobCard.getId(), USER_TYPE);
+                        JobCardProduct jobCardProduct = new JobCardProduct(jobCardsDTO.getOtherProductsDTOList().get(i), jobCard.getId(), userId);
                         jobCardProductRepository.save(jobCardProduct);
                     }
                 }
                 if (jobCardsDTO.getProductBillDTOList() != null) {
-                    for (int i = 0; i < jobCardsDTO.getProductBillDTOList().size(); i++) {
-                        JobCardProduct jobCardProduct = new JobCardProduct(jobCardsDTO.getProductBillDTOList().get(i), jobCard.getId(), USER_TYPE);
+                    for (ProductBillDTO productBillDTO : jobCardsDTO.getProductBillDTOList()) {
+                        Integer manufacturerId = productManufacturerRepository
+                                .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
+                                .map(pm -> pm.getId()).orElse(null);
+                        JobCardProduct jobCardProduct = new JobCardProduct(productBillDTO, jobCard.getId(), userId, manufacturerId);
                         jobCardProductRepository.save(jobCardProduct);
                     }
                 }
+                notifyAllAdmins(jobCard,
+                        "New Job Card : " + jobCard.getCode(),
+                        "A customer has created a new job card.");
                 ReturnObject returnObject = new ReturnObject();
                 returnObject.setMessage("New Job Card Created Successfully");
                 returnObject.setData(jobCard);
@@ -673,18 +700,31 @@ public class JobCardService {
                 }
                 jobCardImagesRepository.saveAll(jobCardImagesList);
             }
+            String productValidationError = validateProductBillItems(jobCardsDTO.getProductBillDTOList());
+            if (productValidationError != null) {
+                ReturnObject returnObject = new ReturnObject();
+                returnObject.setMessage(productValidationError);
+                returnObject.setData(null);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+            }
             if (jobCardsDTO.getOtherProductsDTOList() != null) {
                 for (int i = 0; i < jobCardsDTO.getOtherProductsDTOList().size(); i++) {
-                    JobCardProduct jobCardProduct = new JobCardProduct(jobCardsDTO.getOtherProductsDTOList().get(i), jobCard.getId(), USER_TYPE);
+                    JobCardProduct jobCardProduct = new JobCardProduct(jobCardsDTO.getOtherProductsDTOList().get(i), jobCard.getId(), userId);
                     jobCardProductRepository.save(jobCardProduct);
                 }
             }
             if (jobCardsDTO.getProductBillDTOList() != null) {
-                for (int i = 0; i < jobCardsDTO.getProductBillDTOList().size(); i++) {
-                    JobCardProduct jobCardProduct = new JobCardProduct(jobCardsDTO.getProductBillDTOList().get(i), jobCard.getId(), USER_TYPE);
+                for (ProductBillDTO productBillDTO : jobCardsDTO.getProductBillDTOList()) {
+                    Integer manufacturerId = productManufacturerRepository
+                            .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
+                            .map(pm -> pm.getId()).orElse(null);
+                    JobCardProduct jobCardProduct = new JobCardProduct(productBillDTO, jobCard.getId(), userId, manufacturerId);
                     jobCardProductRepository.save(jobCardProduct);
                 }
             }
+            notifyAllAdmins(jobCard,
+                    "New Job Card : " + jobCard.getCode(),
+                    "A customer has created a new job card.");
             ReturnObject returnObject = new ReturnObject();
             returnObject.setMessage("New Job Card Created Successfully");
             returnObject.setData(jobCard);
@@ -758,21 +798,26 @@ public class JobCardService {
         // Handle Other Products
         if (jobCardsDTO.getOtherProductsDTOList() != null) {
             for (OtherProductDTO otherProductDTO : jobCardsDTO.getOtherProductsDTOList()) {
-                JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, jobCard.getId(), ADMIN_TYPE);
+                JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, jobCard.getId(), userId);
                 jobCardProductRepository.save(jobCardProduct);
             }
         }
 
         // Handle Product Bills
         if (jobCardsDTO.getProductBillDTOList() != null) {
+            String productValidationError = validateProductBillItems(jobCardsDTO.getProductBillDTOList());
+            if (productValidationError != null) {
+                returnObject.setMessage(productValidationError);
+                returnObject.setStatus(false);
+                returnObject.setData(null);
+                return returnObject;
+            }
             for (ProductBillDTO productBillDTO : jobCardsDTO.getProductBillDTOList()) {
-                Optional<Product> existingProduct = productRepository.findById(productBillDTO.getId());
-                if (existingProduct.isPresent()) {
-                    JobCardProduct jobCardProduct = new JobCardProduct(productBillDTO, jobCard.getId(), ADMIN_TYPE);
-                    jobCardProductRepository.save(jobCardProduct);
-                } else {
-                    System.out.println("Product with ID " + productBillDTO.getId() + " does not exist.");
-                }
+                Integer manufacturerId = productManufacturerRepository
+                        .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
+                        .map(pm -> pm.getId()).orElse(null);
+                JobCardProduct jobCardProduct = new JobCardProduct(productBillDTO, jobCard.getId(), userId, manufacturerId);
+                jobCardProductRepository.save(jobCardProduct);
             }
         }
 
@@ -786,6 +831,9 @@ public class JobCardService {
             jobCardNotesRepository.save(privateNotes);
         }
 
+        notifyCustomer(jobCard,
+                "New Job Card : " + jobCard.getCode(),
+                "Admin has created a new job card for you. Please review it.");
         returnObject.setMessage("New Job Card Created Successfully");
         returnObject.setStatus(true);
         returnObject.setData(jobCard);
@@ -895,17 +943,16 @@ public class JobCardService {
                     existingJobCard.setPrice(jobCardsDTO.getPrice());
                     existingJobCard.setDownPayment(jobCardsDTO.getDownPayment());
                     existingJobCard.setCarId(jobCardsDTO.getCarId());
-                    if (existingJobCard.getJobCardStatusId().equals(NEW)) {
-                        existingJobCard.setJobCardStatusId(PENDING_CUSTOMER_APPROVAL); //Pending Customer
-                    } else if (existingJobCard.getJobCardStatusId().equals(APPROVED)) {
-                        existingJobCard.setJobCardStatusId(COMPLETED); //Completed
-                        //Create Invoice
+                    if ("Approved".equals(jobCardsDTO.getJobCardStatus())) {
+                        existingJobCard.setJobCardStatusId(COMPLETED);
                         if (!billService.checkExistingInvoice(existingJobCard)) {
                             billService.createJobCardBill(jobCardsDTO.getUserId(), existingJobCard, userAdmin.getName());
                         } else {
                             returnObject.setMessage("Invoice Already Created");
                             returnObject.setStatus(false);
                         }
+                    } else {
+                        existingJobCard.setJobCardStatusId(PENDING_CUSTOMER_APPROVAL);
                     }
                     // Save updated job card
                     jobCardRepository.save(existingJobCard);
@@ -935,25 +982,65 @@ public class JobCardService {
                         }
                     }*/
 
-                    // Clear existing products associated with the job card
-                    jobCardProductRepository.deleteAllByJobCardId(existingJobCard.getId());
-
-                    // Save new products associated with the job card
-                    if (jobCardsDTO.getOtherProductsDTOList() != null) {
+                    // Replace free-text other products only when the list is provided and non-empty
+                    if (jobCardsDTO.getOtherProductsDTOList() != null && !jobCardsDTO.getOtherProductsDTOList().isEmpty()) {
+                        jobCardProductRepository.deleteAllByJobCardIdAndProductIdIsNull(existingJobCard.getId());
                         for (OtherProductDTO otherProductDTO : jobCardsDTO.getOtherProductsDTOList()) {
-                            JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, existingJobCard.getId(), ADMIN_TYPE);
+                            JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, existingJobCard.getId(), userId);
                             jobCardProductRepository.save(jobCardProduct);
                         }
                     }
 
-                    // Save new products associated with the job card
-                    if (jobCardsDTO.getProductBillDTOList() != null) {
+                    // For catalog products: only touch when list is provided and non-empty (empty list = no change)
+                    if (jobCardsDTO.getProductBillDTOList() != null && !jobCardsDTO.getProductBillDTOList().isEmpty()) {
+                        String productValidationError = validateProductBillItems(jobCardsDTO.getProductBillDTOList());
+                        if (productValidationError != null) {
+                            returnObject.setMessage(productValidationError);
+                            returnObject.setStatus(false);
+                            returnObject.setData(null);
+                            return returnObject;
+                        }
+                        Set<Integer> incomingProductIds = jobCardsDTO.getProductBillDTOList().stream()
+                                .map(ProductBillDTO::getId)
+                                .collect(Collectors.toSet());
+                        List<JobCardProduct> existingCatalogProducts =
+                                jobCardProductRepository.findAllByJobCardIdAndProductIdIsNotNull(existingJobCard.getId());
+                        for (JobCardProduct existing : existingCatalogProducts) {
+                            if (!incomingProductIds.contains(existing.getProductId())) {
+                                jobCardProductRepository.delete(existing);
+                            }
+                        }
                         for (ProductBillDTO productBillDTO : jobCardsDTO.getProductBillDTOList()) {
-                            JobCardProduct jobCardProduct = new JobCardProduct(productBillDTO, existingJobCard.getId(), ADMIN_TYPE);
+                            Integer manufacturerId = productManufacturerRepository
+                                    .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
+                                    .map(pm -> pm.getId()).orElse(null);
+                            Optional<JobCardProduct> existingProductOpt = jobCardProductRepository
+                                    .findByJobCardIdAndProductId(existingJobCard.getId(), productBillDTO.getId());
+                            JobCardProduct jobCardProduct;
+                            if (existingProductOpt.isPresent()) {
+                                // Update in place — preserve id, createdBy, customerApprovedAt
+                                jobCardProduct = existingProductOpt.get();
+                                jobCardProduct.setQuantity(productBillDTO.getQuantity());
+                                jobCardProduct.setName(productBillDTO.getProductName());
+                                jobCardProduct.setPrice(String.valueOf(productBillDTO.getPrice()));
+                                jobCardProduct.setDiscount(productBillDTO.getDiscount());
+                                jobCardProduct.setManufacturerId(manufacturerId);
+                            } else {
+                                jobCardProduct = new JobCardProduct(productBillDTO, existingJobCard.getId(), userId, manufacturerId);
+                            }
                             jobCardProductRepository.save(jobCardProduct);
                         }
                     }
-                    notifyUserForJobCardUpdate(existingJobCard);
+                    // Notify customer based on the resulting status
+                    if (existingJobCard.getJobCardStatusId() == COMPLETED) {
+                        notifyCustomer(existingJobCard,
+                                "Job Card Confirmed : " + existingJobCard.getCode(),
+                                "Your job card has been confirmed and completed.");
+                    } else if (existingJobCard.getJobCardStatusId() == PENDING_CUSTOMER_APPROVAL) {
+                        notifyCustomer(existingJobCard,
+                                "Job Card Pending Approval : " + existingJobCard.getCode(),
+                                "Your job card is pending your approval. Please review it.");
+                    }
                     if (jobCardsDTO.getCustomerNotes() != null) {
                         if (!jobCardsDTO.getCustomerNotes().trim().isEmpty()) {
                             JobCardNotes jobCardNotes = new JobCardNotes();
@@ -1021,7 +1108,9 @@ public class JobCardService {
                     jobCardRepository.save(existingJobCard);
 
 
-                    notifyUserForJobCardUpdate(existingJobCard);
+                    notifyCustomer(existingJobCard,
+                            "Job Card Confirmed : " + existingJobCard.getCode(),
+                            "Your job card has been confirmed and is now completed.");
                     returnObject.setMessage("Job Card Updated Successfully");
                     returnObject.setData(existingJobCard);
                     returnObject.setStatus(true);
@@ -1057,19 +1146,11 @@ public class JobCardService {
             if (jobCardOptional.isPresent()) {
                 JobCard jobCard = jobCardOptional.get();
                 if (Objects.equals(userId, jobCard.getUserId())) {
-                    if (jobCard.getJobCardStatusId() == PENDING_CUSTOMER_APPROVAL) {
+                    if (jobCard.getJobCardStatusId() == PENDING_CUSTOMER_APPROVAL
+                            && "Approved".equals(jobCardsDTO.getChangeStatusTo())) {
                         jobCard.setJobCardStatusId(APPROVED);
                         jobCardRepository.save(jobCard);
-                        List<JobCardNotes> adminNotesNotYetApprovedByCustomer = jobCardNotesRepository.findAllByJobCardIdAndIsPrivateAndApprovedByCustomerAtIsNullAndCreatedByNot(jobCard.getId(), false, userId);
-                        System.out.println("getAdminNotes Count : " + adminNotesNotYetApprovedByCustomer.size());
-                        if (!adminNotesNotYetApprovedByCustomer.isEmpty()) {
-                            for (JobCardNotes jobCardNotes : adminNotesNotYetApprovedByCustomer) {
-                                jobCardNotes.setApprovedByCustomerAt(Timestamp.from(Instant.now()));
-                                jobCardNotes.setCustomerMobileVersion(jobCardsDTO.getCustomerMobileVersion());
-                                jobCardNotes.setCustomerMobileMacAddress(jobCardsDTO.getCustomerMobileMacAddress());
-                                jobCardNotesRepository.save(jobCardNotes);
-                            }
-                        }
+                        approveAllPendingAdminNotes(jobCard.getId(), userId, jobCardsDTO);
                         Optional<List<JobCardProduct>> adminProductsNotYetApprovedByCustomerOptional = jobCardProductRepository.findAllByJobCardIdAndCustomerApprovedAt(jobCardId, null);
                         if (adminProductsNotYetApprovedByCustomerOptional.isPresent()) {
                             List<JobCardProduct> jobCardProductList = adminProductsNotYetApprovedByCustomerOptional.get();
@@ -1082,7 +1163,7 @@ public class JobCardService {
                             }
                         }
 
-                        if (jobCardsDTO.getCustomerNotes() != null) {
+                        if (jobCardsDTO.getCustomerNotes() != null && !jobCardsDTO.getCustomerNotes().trim().isEmpty()) {
                             JobCardNotes jobCardNotes = new JobCardNotes();
                             jobCardNotes.setMessage(jobCardsDTO.getCustomerNotes());
                             jobCardNotes.setJobCardId(jobCard.getId());
@@ -1106,7 +1187,7 @@ public class JobCardService {
                             existingJobCard.setIsTestDrive(jobCardsDTO.getIsTestDrive());
                             existingJobCard.setPrice(jobCardsDTO.getPrice());
                             existingJobCard.setCarId(jobCardsDTO.getCarId());
-                            if (!existingJobCard.getJobCardStatusId().equals(NEW)) {
+                            if (!existingJobCard.getJobCardStatusId().equals(NEW) && !existingJobCard.getJobCardStatusId().equals(PENDING_CUSTOMER_APPROVAL)) {
                                 returnObject.setMessage("Job Card Doesn't Exist");
                                 returnObject.setData(null);
                                 returnObject.setStatus(false);
@@ -1131,17 +1212,51 @@ public class JobCardService {
                                 }
                                 jobCardsDTO.setJobCardsUrl(uploadedUrls);
                             }
-                            // Clear existing products associated with the job card
-                            jobCardProductRepository.deleteAllByJobCardId(existingJobCard.getId());
-                            if (jobCardsDTO.getOtherProductsDTOList() != null) {
+                            // Replace free-text other products only when the list is provided and non-empty
+                            if (jobCardsDTO.getOtherProductsDTOList() != null && !jobCardsDTO.getOtherProductsDTOList().isEmpty()) {
+                                jobCardProductRepository.deleteAllByJobCardIdAndProductIdIsNull(existingJobCard.getId());
                                 for (OtherProductDTO otherProductDTO : jobCardsDTO.getOtherProductsDTOList()) {
-                                    JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, existingJobCard.getId(), ADMIN_TYPE);
+                                    JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, existingJobCard.getId(), userId);
                                     jobCardProductRepository.save(jobCardProduct);
                                 }
                             }
-                            if (jobCardsDTO.getProductBillDTOList() != null) {
+                            // For catalog products: only touch when list is provided and non-empty (empty list = no change)
+                            if (jobCardsDTO.getProductBillDTOList() != null && !jobCardsDTO.getProductBillDTOList().isEmpty()) {
+                                String productValidationError = validateProductBillItems(jobCardsDTO.getProductBillDTOList());
+                                if (productValidationError != null) {
+                                    returnObject.setMessage(productValidationError);
+                                    returnObject.setStatus(false);
+                                    returnObject.setData(null);
+                                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                                }
+                                Set<Integer> incomingProductIds = jobCardsDTO.getProductBillDTOList().stream()
+                                        .map(ProductBillDTO::getId)
+                                        .collect(Collectors.toSet());
+                                List<JobCardProduct> existingCatalogProducts =
+                                        jobCardProductRepository.findAllByJobCardIdAndProductIdIsNotNull(existingJobCard.getId());
+                                for (JobCardProduct existing : existingCatalogProducts) {
+                                    if (!incomingProductIds.contains(existing.getProductId())) {
+                                        jobCardProductRepository.delete(existing);
+                                    }
+                                }
                                 for (ProductBillDTO productBillDTO : jobCardsDTO.getProductBillDTOList()) {
-                                    JobCardProduct jobCardProduct = new JobCardProduct(productBillDTO, existingJobCard.getId(), ADMIN_TYPE);
+                                    Integer manufacturerId = productManufacturerRepository
+                                            .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
+                                            .map(pm -> pm.getId()).orElse(null);
+                                    Optional<JobCardProduct> existingProductOpt = jobCardProductRepository
+                                            .findByJobCardIdAndProductId(existingJobCard.getId(), productBillDTO.getId());
+                                    JobCardProduct jobCardProduct;
+                                    if (existingProductOpt.isPresent()) {
+                                        // Update in place — preserve id, createdBy, customerApprovedAt
+                                        jobCardProduct = existingProductOpt.get();
+                                        jobCardProduct.setQuantity(productBillDTO.getQuantity());
+                                        jobCardProduct.setName(productBillDTO.getProductName());
+                                        jobCardProduct.setPrice(String.valueOf(productBillDTO.getPrice()));
+                                        jobCardProduct.setDiscount(productBillDTO.getDiscount());
+                                        jobCardProduct.setManufacturerId(manufacturerId);
+                                    } else {
+                                        jobCardProduct = new JobCardProduct(productBillDTO, existingJobCard.getId(), userId, manufacturerId);
+                                    }
                                     jobCardProductRepository.save(jobCardProduct);
                                 }
                             }
@@ -1165,14 +1280,20 @@ public class JobCardService {
                                     jobCardNotesRepository.save(jobCardNotes);
                                 }
                             }
-                            notifyUserForJobCardUpdate(existingJobCard);
+                            // Approve any pending admin notes whenever the customer updates
+                            approveAllPendingAdminNotes(existingJobCard.getId(), userId, jobCardsDTO);
+                            notifyAllAdmins(existingJobCard,
+                                    "Job Card Updated : " + existingJobCard.getCode(),
+                                    "A customer has updated their job card.");
                             returnObject.setMessage("Job Card Updated Successfully");
                             returnObject.setData(existingJobCard);
                             returnObject.setStatus(true);
+                            return ResponseEntity.status(HttpStatus.OK).body(returnObject);
                         } else {
                             returnObject.setMessage("Job Card Doesn't Exist");
                             returnObject.setData(null);
                             returnObject.setStatus(false);
+                            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
                         }
                     }
 
@@ -1180,8 +1301,7 @@ public class JobCardService {
                     returnObject.setStatus(true);
                     returnObject.setData(jobCard);
                     return ResponseEntity.status(HttpStatus.OK).body(returnObject);
-                }
-                else {
+                } else {
                     returnObject.setMessage("Only User has created JobCard can update it");
                     returnObject.setStatus(false);
                     returnObject.setData(null);
@@ -1202,12 +1322,44 @@ public class JobCardService {
 
     }
 
-    private void notifyUserForJobCardUpdate(JobCard existingJobCard) {
+    /**
+     * Validates every ProductBillDTO in the list.
+     * Returns an error message string if any item is invalid, or null if all items are valid.
+     * Checks:
+     * 1. The product exists in the product table.
+     * 2. The sellerBrandId is linked to that product via product_manufacturer.
+     */
+    private String validateProductBillItems(List<com.gsc.gsc.bill.dto.ProductBillDTO> items) {
+        if (items == null) return null;
+        for (com.gsc.gsc.bill.dto.ProductBillDTO dto : items) {
+            Optional<Product> productOptional = productRepository.findById(dto.getId());
+            if (productOptional.isEmpty()) {
+                return "Product with ID " + dto.getId() + " does not exist";
+            }
+            if (dto.getSellerBrandId() == null) {
+                return "Seller brand is required for product: " + dto.getId();
+            }
+            Optional<ProductManufacturer> pmOptional =
+                    productManufacturerRepository.findBySellerBrandIdAndProductId(
+                            dto.getSellerBrandId(), dto.getId());
+            if (pmOptional.isEmpty()) {
+                return "Seller brand " + dto.getSellerBrandId()
+                        + " is not linked to product " + dto.getId();
+            }
+        }
+        return null;
+    }
+
+    private void notifyUserForJobCardUpdate(JobCard existingJobCard, Integer updatingUserId) {
+        // Don't notify the user if they are the one who made the update
+        if (updatingUserId != null && updatingUserId.equals(existingJobCard.getUserId())) {
+            return;
+        }
         Optional<User> userOptional = userRepository.findById(existingJobCard.getUserId());
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             String title = "Updated Job Card : " + existingJobCard.getCode();
-            String body  = "Your Job Card has been updated by admin with price: " + existingJobCard.getPrice();
+            String body = "Your Job Card has been updated by admin with price: " + existingJobCard.getPrice();
 
             if (user.getFirebaseToken() != null) {
                 NotificationMessage notificationMessage = new NotificationMessage();
@@ -1220,6 +1372,62 @@ public class JobCardService {
 
                 Notification notification = new Notification();
                 notification.setUserId(user.getId());
+                notification.setTitle(title);
+                notification.setText(body);
+                notification.setIsSent(!"Failed".equals(result));
+                notification.setNotificationType(JOB_CARD);
+                notificationRepository.save(notification);
+            }
+        }
+    }
+
+    private void notifyCustomer(JobCard jobCard, String title, String body) {
+        Optional<User> userOptional = userRepository.findById(jobCard.getUserId());
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            if (user.getFirebaseToken() != null) {
+                NotificationMessage notificationMessage = new NotificationMessage();
+                notificationMessage.setTitle(title);
+                notificationMessage.setBody(body);
+                notificationMessage.setData(Map.of("message", body));
+                notificationMessage.setRecToken(user.getFirebaseToken());
+                System.out.println("Notify customer : " + user.getId() + " token: " + user.getFirebaseToken());
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                Notification notification = new Notification();
+                notification.setUserId(user.getId());
+                notification.setTitle(title);
+                notification.setText(body);
+                notification.setIsSent(!"Failed".equals(result));
+                notification.setNotificationType(JOB_CARD);
+                notificationRepository.save(notification);
+            }
+        }
+    }
+
+    private void approveAllPendingAdminNotes(Integer jobCardId, Integer userId, JobCardsDTO jobCardsDTO) {
+        List<JobCardNotes> pending = jobCardNotesRepository.findPendingAdminNotes(jobCardId, userId);
+        System.out.println("[Notes] Pending admin notes to approve: " + pending.size());
+        for (JobCardNotes note : pending) {
+            note.setApprovedByCustomerAt(Timestamp.from(Instant.now()));
+            note.setCustomerMobileVersion(jobCardsDTO.getCustomerMobileVersion());
+            note.setCustomerMobileMacAddress(jobCardsDTO.getCustomerMobileMacAddress());
+            jobCardNotesRepository.save(note);
+        }
+    }
+
+    private void notifyAllAdmins(JobCard jobCard, String title, String body) {
+        List<User> admins = userRepository.findAllByAccountTypeId(ADMIN_TYPE);
+        for (User admin : admins) {
+            if (admin.getFirebaseToken() != null) {
+                NotificationMessage notificationMessage = new NotificationMessage();
+                notificationMessage.setTitle(title);
+                notificationMessage.setBody(body);
+                notificationMessage.setData(Map.of("message", body));
+                notificationMessage.setRecToken(admin.getFirebaseToken());
+                System.out.println("Notify admin : " + admin.getId() + " token: " + admin.getFirebaseToken());
+                String result = firebaseMessagingService.sendNotification(notificationMessage);
+                Notification notification = new Notification();
+                notification.setUserId(admin.getId());
                 notification.setTitle(title);
                 notification.setText(body);
                 notification.setIsSent(!"Failed".equals(result));

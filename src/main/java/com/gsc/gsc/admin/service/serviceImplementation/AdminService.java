@@ -49,6 +49,8 @@ import com.gsc.gsc.user.dto.LoginResponseDTO;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import static com.gsc.gsc.constants.NotificationTypes.ADMIN;
 import static com.gsc.gsc.constants.UserTypes.ADMIN_TYPE;
+import static com.gsc.gsc.constants.UserTypes.BUSINESS_TYPE;
+import static com.gsc.gsc.constants.UserTypes.USER_TYPE;
 import static com.gsc.gsc.user.service.serviceImplementation.UserService.cleanMobileNumber;
 
 @Service
@@ -316,13 +318,25 @@ public class AdminService implements IAdminService {
 
         // Build target user list based on targetType
         List<User> targetUsers = new ArrayList<>();
-        if ("ALL".equals(notificationDTO.getTargetType())) {
-            // Send to all non-admin users (exclude accountTypeId = ADMIN_TYPE)
+        String targetType = notificationDTO.getTargetType();
+
+        if ("ALL".equals(targetType)) {
+            // All non-admin users
             targetUsers = userRepository.findAll().stream()
                     .filter(u -> u.getAccountTypeId() != ADMIN_TYPE)
                     .collect(Collectors.toList());
+        } else if ("BUSINESS".equals(targetType)) {
+            // Only business customers
+            targetUsers = userRepository.findAll().stream()
+                    .filter(u -> u.getAccountTypeId() != null && u.getAccountTypeId() == BUSINESS_TYPE)
+                    .collect(Collectors.toList());
+        } else if ("PERSONAL".equals(targetType)) {
+            // Only personal customers
+            targetUsers = userRepository.findAll().stream()
+                    .filter(u -> u.getAccountTypeId() != null && u.getAccountTypeId() == USER_TYPE)
+                    .collect(Collectors.toList());
         } else {
-            // Send to specific users by ID
+            // No targetType — fall back to explicit user ID list
             if (notificationDTO.getUserIds() == null || notificationDTO.getUserIds().isEmpty()) {
                 returnObject.setMessage("No Users Selected");
                 returnObject.setData(null);

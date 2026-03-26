@@ -85,6 +85,8 @@ public class BillService implements IBillService {
     @Autowired
     private BillNotesRepository billNotesRepository;
     @Autowired
+    private JobCardNotesRepository jobCardNotesRepository;
+    @Autowired
     private NotificationRepository notificationRepository;
     @Autowired
     private FirebaseMessagingService firebaseMessagingService;
@@ -411,7 +413,8 @@ public class BillService implements IBillService {
                 bill.setCustomerNotes(addBillDTO.getNotes());
                 bill.setTotal(addBillDTO.getTotal());
                 bill.setDiscount(addBillDTO.getDiscount());
-                bill.setDiscountType(addBillDTO.getDiscountType());
+                bill.setDiscountType(addBillDTO.getDiscountType() != null ? addBillDTO.getDiscountType() : "V");
+                bill.setDiscountLevel(addBillDTO.getDiscountLevel() != null ? addBillDTO.getDiscountLevel() : "INVOICE");
                 bill.setFinalTotalPrice(addBillDTO.getFinalTotalPrice());
                 bill.setDownPayment(addBillDTO.getDownPayment());
                 bill.setDate(addBillDTO.getDate());
@@ -435,9 +438,11 @@ public class BillService implements IBillService {
                     billProduct.setProductId(productBillDTO.getId());
                     billProduct.setBillId(bill.getId());
                     billProduct.setPrice(productBillDTO.getPrice());
+                    billProduct.setDiscount(productBillDTO.getDiscount());
                     billProduct.setQuantity(productBillDTO.getQuantity());
                     billProduct.setName(productBillDTO.getProductName());
                     billProduct.setProductManufacturerId(manufacturer.getId());
+                    billProduct.setCreatedBy(userId);
                     billProductRepository.save(billProduct);
                 }
             }
@@ -468,7 +473,9 @@ public class BillService implements IBillService {
                     billProduct.setName(addBillDTO.getOtherProductsDTOList().get(i).getProductName());
                     billProduct.setProductId(null);
                     billProduct.setPrice(Double.valueOf(addBillDTO.getOtherProductsDTOList().get(i).getPrice()));
+                    billProduct.setDiscount(addBillDTO.getOtherProductsDTOList().get(i).getDiscount());
                     billProduct.setQuantity(addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
+                    billProduct.setCreatedBy(userId);
                     billProductList.add(billProduct);
                     try {
                         // Your save operation here
@@ -532,6 +539,8 @@ public class BillService implements IBillService {
         bill.setReferenceNumber("Inv" + jobCard.getCode());
         bill.setStatusId(NOT_PAID);
         bill.setCreatedBy(ADMIN_TYPE);
+        bill.setDiscountType("V");
+        bill.setDiscountLevel("INVOICE");
         Optional<BillType> billTypeOptional = billTypeRepository.findBillTypeByCode("3");
         Bill finalBill = bill;
         billTypeOptional.ifPresent(billType -> finalBill.setBillTypeId(billType.getId()));
@@ -558,6 +567,22 @@ public class BillService implements IBillService {
                 billProducts.add(billProduct);
             }
             billProductRepository.saveAll(billProducts);
+        }
+        // Copy job card notes to bill notes
+        List<JobCardNotes> jobCardNotes = jobCardNotesRepository.findAllByJobCardId(jobCard.getId());
+        List<BillNotes> billNotesList = new ArrayList<>();
+        for (JobCardNotes jcNote : jobCardNotes) {
+            BillNotes billNote = new BillNotes();
+            billNote.setBillId(bill.getId());
+            billNote.setMessage(jcNote.getMessage());
+            billNote.setCreatedBy(jcNote.getCreatedBy());
+            billNote.setIsPrivate(jcNote.getIsPrivate());
+            billNote.setCustomerMobileVersion(jcNote.getCustomerMobileVersion());
+            billNote.setApprovedByCustomerAt(jcNote.getApprovedByCustomerAt());
+            billNotesList.add(billNote);
+        }
+        if (!billNotesList.isEmpty()) {
+            billNotesRepository.saveAll(billNotesList);
         }
         notifyCustomerForJobCardBill(userId, jobCard.getCode(), adminName);
     }
@@ -758,24 +783,12 @@ public class BillService implements IBillService {
 
         if (user.getAccountTypeId() == ADMIN_TYPE) {
             // Discount permission check — runs before any field is modified
-            if (addBillDTO.getDiscount() != null && addBillDTO.getDiscount() > 0
-                    && addBillDTO.getDiscountType() != null) {
-
-                double effectivePercent;
-                String discountType = addBillDTO.getDiscountType().toUpperCase();
-
-                if (discountType.equals("AMOUNT")) {
-                    // Convert amount discount to percentage for permission check
-                    Double total = addBillDTO.getTotal();
-                    if (total != null && total > 0) {
-                        effectivePercent = (addBillDTO.getDiscount() / total) * 100.0;
-                    } else {
-                        effectivePercent = 0.0;
-                    }
-                } else {
-                    // PERCENTAGE or PERCENT — use as-is
-                    effectivePercent = addBillDTO.getDiscount();
-                }
+            if (addBillDTO.getDiscount() != null && addBillDTO.getDiscount() > 0) {
+                // Bill-level discount is always a QAR value — convert to % for the permission check
+                Double total = addBillDTO.getTotal();
+                double effectivePercent = (total != null && total > 0)
+                        ? (addBillDTO.getDiscount() / total) * 100.0
+                        : 0.0;
 
                 if (effectivePercent > 0) {
                     String discountError = adminPermissionService.checkDiscountLimit(userId, effectivePercent);
@@ -791,12 +804,26 @@ public class BillService implements IBillService {
                 }
             }
 
+            // Down payment validation
+            if (addBillDTO.getDownPayment() != null && addBillDTO.getDownPayment() > 0) {
+                Double effectiveTotal = (addBillDTO.getFinalTotalPrice() != null && addBillDTO.getFinalTotalPrice() > 0)
+                        ? addBillDTO.getFinalTotalPrice()
+                        : addBillDTO.getTotal();
+                if (effectiveTotal != null && addBillDTO.getDownPayment() >= effectiveTotal) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Down payment cannot be equal to or exceed the total bill amount");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                }
+            }
+
             // Update existing bill properties
             existingBill.setAdminNotes(addBillDTO.getPrivateNotes());
             existingBill.setCustomerNotes(addBillDTO.getNotes());
             existingBill.setTotal(addBillDTO.getTotal());
             existingBill.setDiscount(addBillDTO.getDiscount());
-            existingBill.setDiscountType(addBillDTO.getDiscountType());
+            existingBill.setDiscountType(addBillDTO.getDiscountType() != null ? addBillDTO.getDiscountType() : "V");
+            existingBill.setDiscountLevel(addBillDTO.getDiscountLevel() != null ? addBillDTO.getDiscountLevel() : "INVOICE");
             existingBill.setFinalTotalPrice(addBillDTO.getFinalTotalPrice());
             existingBill.setDownPayment(addBillDTO.getDownPayment());
             existingBill.setDate(addBillDTO.getDate());
@@ -832,8 +859,11 @@ public class BillService implements IBillService {
                 BillProduct billProduct = new BillProduct();
                 billProduct.setProductId(addBillDTO.getProductBillDTOList().get(i).getProductId());
                 billProduct.setPrice(addBillDTO.getProductBillDTOList().get(i).getPrice());
+                billProduct.setDiscount(addBillDTO.getProductBillDTOList().get(i).getDiscount());
                 billProduct.setQuantity(addBillDTO.getProductBillDTOList().get(i).getQuantity());
+                billProduct.setName(addBillDTO.getProductBillDTOList().get(i).getProductName());
                 billProduct.setBillId(existingBill.getId());
+                billProduct.setCreatedBy(userId);
                 billProductRepository.save(billProduct);
             }
 
@@ -844,7 +874,9 @@ public class BillService implements IBillService {
                 System.out.println("ProductQuantity : " + addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
                 billProduct.setQuantity(addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
                 billProduct.setPrice(Double.valueOf(addBillDTO.getOtherProductsDTOList().get(i).getPrice()));
+                billProduct.setDiscount(addBillDTO.getOtherProductsDTOList().get(i).getDiscount());
                 billProduct.setName(addBillDTO.getOtherProductsDTOList().get(i).getProductName());
+                billProduct.setCreatedBy(userId);
                 try {
                     // Your save operation here
                     billProductRepository.save(billProduct);
@@ -950,6 +982,19 @@ public class BillService implements IBillService {
                 }
             }
 
+            // ── Down payment validation ──
+            if (addBillDTO.getDownPayment() != null && addBillDTO.getDownPayment() > 0) {
+                Double effectiveTotal = (addBillDTO.getFinalTotalPrice() != null && addBillDTO.getFinalTotalPrice() > 0)
+                        ? addBillDTO.getFinalTotalPrice()
+                        : addBillDTO.getTotal();
+                if (effectiveTotal != null && addBillDTO.getDownPayment() >= effectiveTotal) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Down payment cannot be equal to or exceed the total bill amount");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+                }
+            }
+
             // ── PHASE 2: All validations passed — now save the bill and write to DB ──
             bill.setStatusId(NOT_PAID);
             Optional<BillType> billTypeOptional = billTypeRepository.findBillTypeByCode(String.valueOf(addBillDTO.getBillTypeId()));
@@ -961,7 +1006,8 @@ public class BillService implements IBillService {
             bill.setCustomerNotes(addBillDTO.getNotes());
             bill.setTotal(addBillDTO.getTotal());
             bill.setDiscount(addBillDTO.getDiscount());
-            bill.setDiscountType(addBillDTO.getDiscountType());
+            bill.setDiscountType(addBillDTO.getDiscountType() != null ? addBillDTO.getDiscountType() : "V");
+            bill.setDiscountLevel(addBillDTO.getDiscountLevel() != null ? addBillDTO.getDiscountLevel() : "INVOICE");
             bill.setFinalTotalPrice(addBillDTO.getFinalTotalPrice());
             bill.setDownPayment(addBillDTO.getDownPayment());
             bill.setDate(addBillDTO.getDate());
@@ -990,6 +1036,7 @@ public class BillService implements IBillService {
                     billProduct.setQuantity(productBillDTO.getQuantity());
                     billProduct.setName(productBillDTO.getProductName());
                     billProduct.setDiscount(productBillDTO.getDiscount());
+                    billProduct.setCreatedBy(userId);
                     billProductList.add(billProduct);
                 }
                 billProductRepository.saveAll(billProductList);
@@ -1004,6 +1051,7 @@ public class BillService implements IBillService {
                         billProduct.setName(productDTO.getProductName());
                         billProduct.setQuantity(productDTO.getQuantity());
                         billProduct.setDiscount(productDTO.getDiscount());
+                        billProduct.setCreatedBy(userId);
                         billProductList.add(billProduct);
                         try {
                             // Your save operation here
@@ -1258,6 +1306,7 @@ public class BillService implements IBillService {
             }
             addBillDTO.setDiscount(bill.getDiscount());
             addBillDTO.setDiscountType(bill.getDiscountType());
+            addBillDTO.setDiscountLevel(bill.getDiscountLevel() != null ? bill.getDiscountLevel() : "INVOICE");
             addBillDTO.setFinalTotalPrice(bill.getFinalTotalPrice());
             addBillDTO.setDate(bill.getDate());
             addBillDTO.setTotal(bill.getTotal());

@@ -265,14 +265,11 @@ public class UserService implements IUserService {
             User user = new User(userDTO);
             String password = bCryptPasswordEncoder.encode(user.getPassword());
             user.setPassword(password);
-            String otp = generateOtp();
-            user.setVerificationOTP(otp);
-            user.setOtpCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
-            if (emailEnabled) emailService.sendOtpEmail(user.getMail(), otp);
-            if (smsEnabled)   vonageSmsService.sendOtpSms(user.getPhone(), otp);
+            // No OTP at registration — verification happens at login
+            user.setIsVerified(true);
             user = userRepository.save(user);
             userDTO.setId(user.getId());
-            userDTO.setToken(jwtTokenUtil.generateToken(user.getId(),USER_TYPE,tokenExpiryTime));
+            userDTO.setToken(jwtTokenUtil.generateToken(user.getId(), userDTO.getCustomerType(), tokenExpiryTime));
             userDTO.setIsVerified(user.getIsVerified());
             userDTO.setIsActive(user.getIsActive());
 

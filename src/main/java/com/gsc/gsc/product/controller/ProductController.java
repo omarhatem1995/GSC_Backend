@@ -13,8 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import org.springframework.data.domain.Pageable;
 
-import java.io.IOException;
-
 import static com.gsc.gsc.utilities.Utilities.getLangId;
 
 @CrossOrigin(origins = "*")
@@ -26,15 +24,18 @@ public class ProductController {
     ProductService productService;
 
     @PostMapping(value = "/admin", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity addProduct(@RequestHeader("Authorization") String token ,@ModelAttribute CreateProductRequest dto) throws IOException {
-        return productService.createProduct(token,dto);
+    public ResponseEntity<?> addProduct(@RequestHeader("Authorization") String token,
+                                        @ModelAttribute CreateProductRequest dto) {
+        return productService.createProduct(token, dto);
     }
-    @PutMapping("admin/{productId}")
-    public ResponseEntity updateProduct(@RequestHeader("Authorization") String token,
-                                        @RequestBody ProductDTO productDTO,
-                                        @PathVariable Integer productId) {
-        return productService.update(token, productId,productDTO );
+
+    @PutMapping(value = "admin/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateProduct(@RequestHeader("Authorization") String token,
+                                           @ModelAttribute ProductDTO productDTO,
+                                           @PathVariable Integer productId) {
+        return productService.update(token, productId, productDTO);
     }
+
     @PostMapping("products")
     public ResponseEntity getProductsWithCount(@RequestHeader("Authorization") String token,
                                       @RequestHeader("Accept-Language") String langId,

@@ -37,28 +37,32 @@ public class JobCardProduct {
     private String customerMobileVersion;
     @Column(name = "created_by")
     private Integer createdBy;
+    @Column(name = "product_manufacturer_id")
+    private Integer manufacturerId;
     @Column(name = "customer_approved_at")
     private Timestamp customerApprovedAt;
     @Column(name = "created_at")
     private Timestamp createdAt;
     @Column(name = "updated_at")
     private Timestamp updatedAt;
-    public JobCardProduct(OtherProductDTO otherProductDTO,Integer jobCardId,Integer userId) {
+    public JobCardProduct(OtherProductDTO otherProductDTO, Integer jobCardId, Integer userId) {
         this.jobCardId = jobCardId;
         this.quantity = otherProductDTO.getQuantity();
-        this.productId = null;
+        this.productId = null;  // null = free-text other product
         this.name = otherProductDTO.getProductName();
         this.price = otherProductDTO.getPrice();
+        this.discount = otherProductDTO.getDiscount();
         this.createdBy = userId;
     }
 
-    public JobCardProduct(ProductBillDTO productBillDTO, Integer id,Integer userId) {
-        this.jobCardId = id;
+    public JobCardProduct(ProductBillDTO productBillDTO, Integer jobCardId, Integer userId, Integer manufacturerId) {
+        this.jobCardId = jobCardId;
         this.quantity = productBillDTO.getQuantity();
-        if(productBillDTO.getId() != null) {
-            this.productId = productBillDTO.getId();
-        }
+        this.productId = productBillDTO.getId();
+        this.name = productBillDTO.getProductName();
         this.price = String.valueOf(productBillDTO.getPrice());
+        this.discount = productBillDTO.getDiscount();
         this.createdBy = userId;
+        this.manufacturerId = manufacturerId;
     }
 }

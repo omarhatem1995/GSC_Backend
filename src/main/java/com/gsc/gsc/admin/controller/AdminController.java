@@ -6,6 +6,7 @@ import com.gsc.gsc.admin.dto.CreateAdminDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
 import com.gsc.gsc.admin.service.serviceImplementation.AdminPermissionService;
 import com.gsc.gsc.admin.service.serviceImplementation.AdminService;
+import com.gsc.gsc.product.service.serviceImplementation.ProductService;
 import com.gsc.gsc.bill.dto.AddBillDTO;
 import com.gsc.gsc.bill.dto.UpdateBillStatusDTO;
 import com.gsc.gsc.bill.service.serviceImplementation.BillService;
@@ -46,6 +47,8 @@ public class AdminController {
     CarService carService;
     @Autowired
     BillService billService;
+    @Autowired
+    ProductService productService;
     @Autowired
     JwtUtil jwtUtil;
 
@@ -144,6 +147,13 @@ public class AdminController {
         return ResponseEntity.status(returnObject.isStatus() ? HttpStatus.OK : HttpStatus.FORBIDDEN).body(returnObject);
     }
 
+    @PostMapping(value ="/job_card/update", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ReturnObject> updateJobCardByAdminJson(@RequestHeader("Authorization") String token,
+                                                                 @RequestBody JobCardsDTO jobCardsDTO) {
+        ReturnObject returnObject = jobCardService.updateByAdmin(token, jobCardsDTO, jobCardsDTO.getJobCardId(), null);
+        return ResponseEntity.status(returnObject.isStatus() ? HttpStatus.OK : HttpStatus.FORBIDDEN).body(returnObject);
+    }
+
     @PutMapping("/job_card/submit/{jobCardId}")
     public ResponseEntity<ReturnObject> submitJobCardByAdmin(@RequestHeader("Authorization") String token,
                                                              @PathVariable Integer jobCardId) {
@@ -227,6 +237,13 @@ public class AdminController {
             @PathVariable Integer adminId,
             @PathVariable Integer userId) {
         return adminPermissionService.resetPointsLimit(token, adminId, userId);
+    }
+
+    @GetMapping("product/v3/{productId}")
+    public ResponseEntity<?> getProductByIdForAdmin(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer productId) {
+        return productService.getProductByIdForAdmin(token, productId);
     }
 
 }

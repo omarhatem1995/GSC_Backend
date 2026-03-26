@@ -22,6 +22,15 @@ public class Bill {
     private Double discount;
     @Column(name = "discount_type")
     private String discountType;
+    /**
+     * "PRODUCT" = discount applied per product (stored in bill_product.discount).
+     *             bill.discount is irrelevant — finalTotalPrice is the sum of product totals after discounts.
+     * "INVOICE"  = discount applied to the whole invoice (stored in bill.discount / bill.discountType).
+     *             bill_product.discount is irrelevant.
+     * Defaults to "INVOICE" for backward compatibility.
+     */
+    @Column(name = "discount_level")
+    private String discountLevel;
     @Column(name = "downPayment")
     private Double downPayment;
     @Column(name = "user_id")
