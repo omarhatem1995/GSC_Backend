@@ -12,8 +12,6 @@ import com.gsc.gsc.model.view.ProductDetailsView;
 import com.gsc.gsc.product.dto.ProductDTO;
 import com.gsc.gsc.repo.*;
 import com.gsc.gsc.user.service.serviceImplementation.UserService;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -564,6 +562,21 @@ public class BillService implements IBillService {
                 billProduct.setCustomerApprovedAt(jobCardProduct.getCustomerApprovedAt());
                 billProduct.setCreatedBy(jobCardProduct.getCreatedBy());
                 billProduct.setCustomerMobileVersion(jobCardProduct.getCustomerMobileVersion());
+
+                // Resolve manufacturer from stored manufacturerId (catalog products only)
+                if (jobCardProduct.getManufacturerId() != null) {
+                    Optional<ProductManufacturer> manufacturerOpt = manufacturerRepository.findById(jobCardProduct.getManufacturerId());
+                    if (manufacturerOpt.isPresent()) {
+                        ProductManufacturer manufacturer = manufacturerOpt.get();
+                        // Decrement stock if tracked (null = unlimited)
+                        if (manufacturer.getQuantity() != null && jobCardProduct.getQuantity() != null) {
+                            manufacturer.setQuantity(manufacturer.getQuantity() - jobCardProduct.getQuantity());
+                            manufacturerRepository.save(manufacturer);
+                        }
+                        billProduct.setProductManufacturerId(manufacturer.getId());
+                    }
+                }
+
                 billProducts.add(billProduct);
             }
             billProductRepository.saveAll(billProducts);
@@ -902,7 +915,7 @@ public class BillService implements IBillService {
     }
 
     @Transactional
-    public ResponseEntity<?> createBill(String token, AddBillDTO addBillDTO) {
+    public ResponseEntity<?> createProductBill(String token, AddBillDTO addBillDTO) {
         Integer userId = getUserIdFromToken(token);
         User user = userRepository.findUserById(userId);
         ReturnObject returnObject = new ReturnObject();
@@ -1261,7 +1274,7 @@ public class BillService implements IBillService {
                         if (productOptional.isPresent()) {
                             Product product = productOptional.get();
                             List<ProductImages> productImages = productImagesRepository.findAllByProductId(product.getId());
-                            productBillDTO.setProductName(product.getCode());
+                            productBillDTO.setProductName(product.getNameEn());
                             if (!productImages.isEmpty()) {
                                 productBillDTO.setImageUrl(productImages.get(0).getUrl());
                             }

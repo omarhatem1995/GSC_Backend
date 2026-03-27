@@ -169,9 +169,9 @@ public class AdminController {
         return billService.createProductBillByAdmin(token, macAddress, mobileVersion, billDTO);
     }
 
-    @PutMapping(value = "bill/{billId}", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PutMapping(value = "bill/{billId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity updateBillByAdmin(@RequestHeader("Authorization") String token,
-                                            @RequestBody AddBillDTO billDTO,
+                                            @RequestPart("data") AddBillDTO billDTO,
                                             @PathVariable Integer billId) {
         return billService.updateBillByAdmin(token, billDTO, billId);
     }

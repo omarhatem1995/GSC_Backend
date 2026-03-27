@@ -88,7 +88,7 @@ public class BillController {
 
     @PostMapping("")
     public ResponseEntity addBill(@RequestHeader("Authorization") String token ,@RequestBody AddBillDTO billDTO) {
-        return billService.createBill(token , billDTO);
+        return billService.createProductBill(token , billDTO);
     }
     @PutMapping("notes/{billId}")
     public ResponseEntity addNotesAdmin(@RequestHeader("Authorization") String token,

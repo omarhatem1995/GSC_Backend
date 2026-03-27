@@ -145,7 +145,7 @@ public class CarService implements ICarService {
                     carDTO.setIsActivated((byte) 1);
                 }
                 Car car = new Car(carDTO, userId);
-                car.setProperty(1);
+                car.setProperty(carDTO.getProperty());
                 car = carRepository.save(car);
 
                 ReturnObject returnObject = new ReturnObject();

@@ -1350,37 +1350,6 @@ public class JobCardService {
         return null;
     }
 
-    private void notifyUserForJobCardUpdate(JobCard existingJobCard, Integer updatingUserId) {
-        // Don't notify the user if they are the one who made the update
-        if (updatingUserId != null && updatingUserId.equals(existingJobCard.getUserId())) {
-            return;
-        }
-        Optional<User> userOptional = userRepository.findById(existingJobCard.getUserId());
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
-            String title = "Updated Job Card : " + existingJobCard.getCode();
-            String body = "Your Job Card has been updated by admin with price: " + existingJobCard.getPrice();
-
-            if (user.getFirebaseToken() != null) {
-                NotificationMessage notificationMessage = new NotificationMessage();
-                notificationMessage.setTitle(title);
-                notificationMessage.setBody(body);
-                notificationMessage.setData(Map.of("message", body));
-                notificationMessage.setRecToken(user.getFirebaseToken());
-                System.out.println("Notification Sent to : " + user.getId() + " , token : " + user.getFirebaseToken());
-                String result = firebaseMessagingService.sendNotification(notificationMessage);
-
-                Notification notification = new Notification();
-                notification.setUserId(user.getId());
-                notification.setTitle(title);
-                notification.setText(body);
-                notification.setIsSent(!"Failed".equals(result));
-                notification.setNotificationType(JOB_CARD);
-                notificationRepository.save(notification);
-            }
-        }
-    }
-
     private void notifyCustomer(JobCard jobCard, String title, String body) {
         Optional<User> userOptional = userRepository.findById(jobCard.getUserId());
         if (userOptional.isPresent()) {

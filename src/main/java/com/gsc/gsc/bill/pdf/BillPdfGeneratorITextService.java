@@ -105,8 +105,8 @@ public class BillPdfGeneratorITextService {
             String referenceNumber = cleanReferenceNumber(bill);
             Optional<JobCard> jobCardOptional = jobCardRepository.findByCode(referenceNumber);
 
-            String[] customerInfo = resolveCustomerInfo(user);   // [0]=userName [1]=address [2]=phone
-            String[] carInfo = resolveCarInfo(bill);             // [0]=licenseNumber [1]=modelCode [2]=modelYear [3]=brandNameEn
+            String[] customerInfo = resolveCustomerInfo(userCreator);   // [0]=userName [1]=address [2]=phone
+            String[] carInfo = resolveCarInfo(bill);             // [0]=plateNumber [1]=modelCode [2]=modelYear [3]=brandNameEn
 
             PdfFont arabicFont = createArabicFontForPdf();
 
@@ -123,7 +123,7 @@ public class BillPdfGeneratorITextService {
             }
 
             // customerInfo: [0]=name [1]=address [2]=phone
-            // carInfo:      [0]=licenseNumber [1]=modelCode [2]=modelYear [3]=brandNameEn
+            // carInfo:      [0]=plateNumber [1]=modelCode [2]=modelYear [3]=brandNameEn
             addInvoiceHeader(document, bill, customerInfo[0], customerInfo[1], customerInfo[2],
                     carInfo[0], carInfo[1], carInfo[2], carInfo[3], userCreator, billTypeName);
 
@@ -212,8 +212,8 @@ public class BillPdfGeneratorITextService {
     }
 
     private String[] resolveCarInfo(Bill bill) {
-        // [0]=licenseNumber  [1]=modelCode  [2]=modelYear  [3]=brandNameEn
-        String licenseNumber = "...........";
+        // [0]=plateNumber  [1]=modelCode  [2]=modelYear  [3]=brandNameEn
+        String plateNumber = "...........";
         String modelCode     = "...........";
         String modelYear     = "...........";
         String brandNameEn   = "...........";
@@ -222,7 +222,7 @@ public class BillPdfGeneratorITextService {
             Optional<Car> carOptional = carRepository.findById(bill.getCarId());
             if (carOptional.isPresent()) {
                 Car car = carOptional.get();
-                if (car.getLicenseNumber() != null) licenseNumber = car.getLicenseNumber();
+                if (car.getPlateNumber() != null) plateNumber = car.getPlateNumber();
 
                 if (car.getModelId() != null) {
                     Optional<Model> modelOptional = modelRepository.findById(car.getModelId());
@@ -242,7 +242,7 @@ public class BillPdfGeneratorITextService {
                 }
             }
         }
-        return new String[]{licenseNumber, modelCode, modelYear, brandNameEn};
+        return new String[]{plateNumber, modelCode, modelYear, brandNameEn};
     }
 
     private String resolveProductName(BillProduct billProduct) {
@@ -588,7 +588,7 @@ public class BillPdfGeneratorITextService {
 
     private void addInvoiceHeader(Document document, Bill bill, String userName,
                                   String address, String phone,
-                                  String licenseNumber, String modelCode, String modelYear, String brandNameEn,
+                                  String plateNumber, String modelCode, String modelYear, String brandNameEn,
                                   User user, String billTypeName) throws IOException {
         InputStream logoStream = getClass().getResourceAsStream("/image/logo2.png");
         if (logoStream == null) throw new IOException("Logo image not found in resources!");
@@ -638,7 +638,7 @@ public class BillPdfGeneratorITextService {
         customerTable.addCell(createCell("Name", true));
         customerTable.addCell(createCell(userName, false));
         customerTable.addCell(createCell("Plate No.", true));
-        customerTable.addCell(createCell(licenseNumber, false));
+        customerTable.addCell(createCell(plateNumber, false));
 
         customerTable.addCell(createCell("Mobile", true));
         customerTable.addCell(createCell(phone, false));
