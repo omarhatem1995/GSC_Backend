@@ -2,8 +2,10 @@ package com.gsc.gsc.admin.service.serviceImplementation;
 
 import com.google.api.Http;
 import com.gsc.gsc.admin.dto.ActivateCarDTO;
+import com.gsc.gsc.admin.dto.AdminPermissionDTO;
 import com.gsc.gsc.admin.dto.CreateAdminDTO;
 import com.gsc.gsc.admin.dto.NotificationDTO;
+import com.gsc.gsc.model.AdminPermission;
 import com.gsc.gsc.admin.service.serviceInterface.IAdminService;
 import com.gsc.gsc.car.dto.CarDTO;
 import com.gsc.gsc.car.dto.UsersCarsDTO;
@@ -514,12 +516,120 @@ public class AdminService implements IAdminService {
 
         User saved = userRepository.save(admin);
 
+        // Create permission record — uses provided permissions or defaults everything to false
+        adminPermissionService.createPermissionsForNewAdmin(saved.getId(), dto.getPermissions());
+
         // Don't return the hashed password
         saved.setPassword(null);
 
         returnObject.setStatus(true);
         returnObject.setMessage("Admin created successfully");
         returnObject.setData(saved);
+        return ResponseEntity.ok(returnObject);
+    }
+
+    public ResponseEntity<?> getAdminById(String token, Integer adminId) {
+        ReturnObject returnObject = new ReturnObject();
+        Integer requesterId = userService.getUserIdFromToken(token);
+
+        if (!adminPermissionService.isSuperAdmin(requesterId) && !requesterId.equals(adminId)) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Not authorized to view this admin");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        User admin = userRepository.findUserById(adminId);
+        if (admin == null || admin.getAccountTypeId() != ADMIN_TYPE) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Admin not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
+        }
+
+        admin.setPassword(null);
+        AdminPermission permissions = adminPermissionRepository.findByAdminId(adminId).orElse(null);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("admin", admin);
+        data.put("permissions", permissions);
+
+        returnObject.setStatus(true);
+        returnObject.setMessage("Loaded successfully");
+        returnObject.setData(data);
+        return ResponseEntity.ok(returnObject);
+    }
+
+    public ResponseEntity<?> updateAdmin(String token, Integer adminId, CreateAdminDTO dto) {
+        ReturnObject returnObject = new ReturnObject();
+        Integer requesterId = userService.getUserIdFromToken(token);
+
+        if (!adminPermissionService.isSuperAdmin(requesterId) && !requesterId.equals(adminId)) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Not authorized to update this admin");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        User admin = userRepository.findUserById(adminId);
+        if (admin == null || admin.getAccountTypeId() != ADMIN_TYPE) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Admin not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
+        }
+
+        // Phone uniqueness — ignore if same admin
+        if (dto.getPhone() != null && !dto.getPhone().isBlank()) {
+            String cleanPhone = cleanMobileNumber(dto.getPhone());
+            dto.setPhone(cleanPhone);
+            User existingByPhone = userRepository.findByPhone(cleanPhone);
+            if (existingByPhone != null && !existingByPhone.getId().equals(adminId)) {
+                returnObject.setStatus(false);
+                returnObject.setMessage("Phone already exists");
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(returnObject);
+            }
+            admin.setPhone(cleanPhone);
+        }
+
+        // Email uniqueness — ignore if same admin
+        if (dto.getMail() != null && !dto.getMail().isBlank()) {
+            User existingByMail = userRepository.findByMail(dto.getMail());
+            if (existingByMail != null && !existingByMail.getId().equals(adminId)) {
+                returnObject.setStatus(false);
+                returnObject.setMessage("Email already exists");
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(returnObject);
+            }
+            admin.setMail(dto.getMail());
+        }
+
+        if (dto.getName() != null && !dto.getName().isBlank()) {
+            admin.setName(dto.getName());
+        }
+
+        if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
+            admin.setPassword(bCryptPasswordEncoder.encode(dto.getPassword()));
+        }
+
+        User saved = userRepository.save(admin);
+        saved.setPassword(null);
+
+        // Update permissions if provided
+        AdminPermission updatedPermissions = null;
+        if (dto.getPermissions() != null) {
+            if (dto.getPermissions().getMaxBillDiscountPercent() != null &&
+                    (dto.getPermissions().getMaxBillDiscountPercent() < 0 || dto.getPermissions().getMaxBillDiscountPercent() > 100)) {
+                returnObject.setStatus(false);
+                returnObject.setMessage("Maximum discount percent must be between 0 and 100");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
+            }
+            adminPermissionService.setPermissionsDirectly(adminId, dto.getPermissions());
+            updatedPermissions = adminPermissionRepository.findByAdminId(adminId).orElse(null);
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("admin", saved);
+        data.put("permissions", updatedPermissions);
+
+        returnObject.setStatus(true);
+        returnObject.setMessage("Admin updated successfully");
+        returnObject.setData(data);
         return ResponseEntity.ok(returnObject);
     }
 

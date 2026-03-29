@@ -135,6 +135,7 @@ public class AdminPermissionService {
     public String checkDiscountLimit(Integer adminId, Double discountPercent) {
         if (isSuperAdmin(adminId)) return null;
         if (discountPercent == null || discountPercent <= 0) return null;
+        if (discountPercent > 100) return "Discount cannot exceed 100%";
 
         Optional<AdminPermission> permOpt = adminPermissionRepository.findByAdminId(adminId);
         if (permOpt.isEmpty()) {
@@ -162,6 +163,13 @@ public class AdminPermissionService {
             returnObject.setStatus(false);
             returnObject.setMessage("Only super admins can manage permissions");
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(returnObject);
+        }
+
+        if (dto.getMaxBillDiscountPercent() != null &&
+                (dto.getMaxBillDiscountPercent() < 0 || dto.getMaxBillDiscountPercent() > 100)) {
+            returnObject.setStatus(false);
+            returnObject.setMessage("Maximum discount percent must be between 0 and 100");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
         }
 
         User targetAdmin = userRepository.findUserById(targetAdminId);
@@ -226,6 +234,29 @@ public class AdminPermissionService {
         returnObject.setMessage("Points limit reset successfully for admin " + targetAdminId + " / user " + userId);
         returnObject.setData(null);
         return ResponseEntity.ok(returnObject);
+    }
+
+    /** Updates permissions directly by adminId — caller is responsible for auth checks. */
+    public void setPermissionsDirectly(Integer adminId, AdminPermissionDTO dto) {
+        AdminPermission permission = adminPermissionRepository.findByAdminId(adminId)
+                .orElse(new AdminPermission());
+        permission.setAdminId(adminId);
+        applyDtoToPermission(permission, dto);
+        adminPermissionRepository.save(permission);
+    }
+
+    /** Creates a permission record for a newly created admin. Safe to call with null dto (defaults all to false). */
+    public void createPermissionsForNewAdmin(Integer adminId, AdminPermissionDTO dto) {
+        AdminPermission permission = new AdminPermission();
+        permission.setAdminId(adminId);
+        if (dto != null) {
+            if (dto.getMaxBillDiscountPercent() != null &&
+                    (dto.getMaxBillDiscountPercent() < 0 || dto.getMaxBillDiscountPercent() > 100)) {
+                dto.setMaxBillDiscountPercent(100.0);
+            }
+            applyDtoToPermission(permission, dto);
+        }
+        adminPermissionRepository.save(permission);
     }
 
     // ─────────────────────────────────────────────────────────────

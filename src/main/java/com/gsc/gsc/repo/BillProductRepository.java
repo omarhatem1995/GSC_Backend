@@ -15,4 +15,10 @@ public interface BillProductRepository extends JpaRepository<BillProduct, Intege
     void deleteAllByBillId(Integer billId);
 
     boolean existsByProductManufacturerId(Integer productManufacturerId);
+
+    Optional<BillProduct> findByBillIdAndProductId(Integer billId, Integer productId);
+
+    Optional<BillProduct> findByBillIdAndProductIdAndCreatedBy(Integer billId, Integer productId, Integer createdBy);
+
+    Optional<BillProduct> findByBillIdAndProductIdAndProductManufacturerId(Integer billId, Integer productId, Integer productManufacturerId);
 }

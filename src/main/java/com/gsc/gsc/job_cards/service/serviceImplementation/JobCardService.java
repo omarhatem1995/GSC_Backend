@@ -268,6 +268,7 @@ public class JobCardService {
         if (carOpt.isEmpty()) return "";
 
         Car car = carOpt.get();
+        if (car.getModelId() == null) return "";
         Optional<Model> modelOpt = modelRepository.findById(car.getModelId());
         if (modelOpt.isEmpty()) return "";
 
@@ -1351,25 +1352,29 @@ public class JobCardService {
     }
 
     private void notifyCustomer(JobCard jobCard, String title, String body) {
-        Optional<User> userOptional = userRepository.findById(jobCard.getUserId());
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
-            if (user.getFirebaseToken() != null) {
-                NotificationMessage notificationMessage = new NotificationMessage();
-                notificationMessage.setTitle(title);
-                notificationMessage.setBody(body);
-                notificationMessage.setData(Map.of("message", body));
-                notificationMessage.setRecToken(user.getFirebaseToken());
-                System.out.println("Notify customer : " + user.getId() + " token: " + user.getFirebaseToken());
-                String result = firebaseMessagingService.sendNotification(notificationMessage);
-                Notification notification = new Notification();
-                notification.setUserId(user.getId());
-                notification.setTitle(title);
-                notification.setText(body);
-                notification.setIsSent(!"Failed".equals(result));
-                notification.setNotificationType(JOB_CARD);
-                notificationRepository.save(notification);
+        try {
+            Optional<User> userOptional = userRepository.findById(jobCard.getUserId());
+            if (userOptional.isPresent()) {
+                User user = userOptional.get();
+                if (user.getFirebaseToken() != null && !user.getFirebaseToken().trim().isEmpty()) {
+                    NotificationMessage notificationMessage = new NotificationMessage();
+                    notificationMessage.setTitle(title);
+                    notificationMessage.setBody(body);
+                    notificationMessage.setData(Map.of("message", body));
+                    notificationMessage.setRecToken(user.getFirebaseToken());
+                    System.out.println("Notify customer : " + user.getId() + " token: " + user.getFirebaseToken());
+                    String result = firebaseMessagingService.sendNotification(notificationMessage);
+                    Notification notification = new Notification();
+                    notification.setUserId(user.getId());
+                    notification.setTitle(title);
+                    notification.setText(body);
+                    notification.setIsSent(!"Failed".equals(result));
+                    notification.setNotificationType(JOB_CARD);
+                    notificationRepository.save(notification);
+                }
             }
+        } catch (Exception e) {
+            System.err.println("[FCM] notifyCustomer failed silently: " + e.getMessage());
         }
     }
 
@@ -1385,24 +1390,32 @@ public class JobCardService {
     }
 
     private void notifyAllAdmins(JobCard jobCard, String title, String body) {
-        List<User> admins = userRepository.findAllByAccountTypeId(ADMIN_TYPE);
-        for (User admin : admins) {
-            if (admin.getFirebaseToken() != null) {
-                NotificationMessage notificationMessage = new NotificationMessage();
-                notificationMessage.setTitle(title);
-                notificationMessage.setBody(body);
-                notificationMessage.setData(Map.of("message", body));
-                notificationMessage.setRecToken(admin.getFirebaseToken());
-                System.out.println("Notify admin : " + admin.getId() + " token: " + admin.getFirebaseToken());
-                String result = firebaseMessagingService.sendNotification(notificationMessage);
-                Notification notification = new Notification();
-                notification.setUserId(admin.getId());
-                notification.setTitle(title);
-                notification.setText(body);
-                notification.setIsSent(!"Failed".equals(result));
-                notification.setNotificationType(JOB_CARD);
-                notificationRepository.save(notification);
+        try {
+            List<User> admins = userRepository.findAllByAccountTypeId(ADMIN_TYPE);
+            for (User admin : admins) {
+                try {
+                    if (admin.getFirebaseToken() != null && !admin.getFirebaseToken().trim().isEmpty()) {
+                        NotificationMessage notificationMessage = new NotificationMessage();
+                        notificationMessage.setTitle(title);
+                        notificationMessage.setBody(body);
+                        notificationMessage.setData(Map.of("message", body));
+                        notificationMessage.setRecToken(admin.getFirebaseToken());
+                        System.out.println("Notify admin : " + admin.getId() + " token: " + admin.getFirebaseToken());
+                        String result = firebaseMessagingService.sendNotification(notificationMessage);
+                        Notification notification = new Notification();
+                        notification.setUserId(admin.getId());
+                        notification.setTitle(title);
+                        notification.setText(body);
+                        notification.setIsSent(!"Failed".equals(result));
+                        notification.setNotificationType(JOB_CARD);
+                        notificationRepository.save(notification);
+                    }
+                } catch (Exception e) {
+                    System.err.println("[FCM] notifyAllAdmins failed for admin " + admin.getId() + " silently: " + e.getMessage());
+                }
             }
+        } catch (Exception e) {
+            System.err.println("[FCM] notifyAllAdmins failed silently: " + e.getMessage());
         }
     }
 }

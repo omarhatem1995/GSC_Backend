@@ -288,10 +288,30 @@ public class UserService implements IUserService {
         Integer userId = getUserIdFromToken(token);
         ReturnObject returnObject = new ReturnObject();
         User user = userRepository.getById(userId);
-        if(dto.getPhone()!=null){
+        if (dto.getPhone() != null) {
             dto.setPhone(cleanMobileNumber(dto.getPhone()));
         }
-        if(user != null) {
+        if (user != null) {
+            // Check phone uniqueness — ignore if it belongs to the same user
+            if (dto.getPhone() != null) {
+                User existingByPhone = userRepository.findByPhone(dto.getPhone());
+                if (existingByPhone != null && !existingByPhone.getId().equals(userId)) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Phone already exists");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(returnObject);
+                }
+            }
+            // Check email uniqueness — ignore if it belongs to the same user
+            if (dto.getMail() != null) {
+                User existingByMail = userRepository.findByMail(dto.getMail());
+                if (existingByMail != null && !existingByMail.getId().equals(userId)) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Email already exists");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(returnObject);
+                }
+            }
             if (dto.getNewPassword() != null) {
                 // Old password is required when changing password
                 if (dto.getPassword() == null || !bCryptPasswordEncoder.matches(dto.getPassword(), user.getPassword())) {
@@ -308,7 +328,7 @@ public class UserService implements IUserService {
             returnObject.setMessage("Updated User Successfully");
             returnObject.setData(updatedUser);
             return ResponseEntity.ok(returnObject);
-        }else{
+        } else {
             returnObject.setStatus(false);
             returnObject.setMessage("User Not Found");
             returnObject.setData(null);
@@ -320,8 +340,36 @@ public class UserService implements IUserService {
         ReturnObject returnObject = new ReturnObject();
         Integer adminUserId = getUserIdFromToken(token);
         User userAdmin = userRepository.getById(adminUserId);
-        if(userAdmin.getAccountTypeId() == ADMIN_TYPE) {
+        if (userAdmin.getAccountTypeId() == ADMIN_TYPE) {
             User user = userRepository.getById(dto.getId());
+            if (user == null) {
+                returnObject.setStatus(false);
+                returnObject.setMessage("User Not Found");
+                returnObject.setData(null);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(returnObject);
+            }
+            // Check phone uniqueness — ignore if it belongs to the same user
+            if (dto.getPhone() != null) {
+                String cleanedPhone = cleanMobileNumber(dto.getPhone());
+                dto.setPhone(cleanedPhone);
+                User existingByPhone = userRepository.findByPhone(cleanedPhone);
+                if (existingByPhone != null && !existingByPhone.getId().equals(dto.getId())) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Phone already exists");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(returnObject);
+                }
+            }
+            // Check email uniqueness — ignore if it belongs to the same user
+            if (dto.getMail() != null) {
+                User existingByMail = userRepository.findByMail(dto.getMail());
+                if (existingByMail != null && !existingByMail.getId().equals(dto.getId())) {
+                    returnObject.setStatus(false);
+                    returnObject.setMessage("Email already exists");
+                    returnObject.setData(null);
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(returnObject);
+                }
+            }
             if (dto.getNewPassword() != null) {
                 String newPassword = bCryptPasswordEncoder.encode(dto.getNewPassword());
                 user.setPassword(newPassword);
@@ -332,7 +380,7 @@ public class UserService implements IUserService {
             User updatedUser = userRepository.save(user);
             returnObject.setData(updatedUser);
             return ResponseEntity.ok(returnObject);
-        }else {
+        } else {
             returnObject.setStatus(false);
             returnObject.setMessage("You are not authorized to update other users");
             returnObject.setData(null);
@@ -349,6 +397,8 @@ public class UserService implements IUserService {
         user.setPhone(dto.getPhone());
         if(dto.getCommercialLicense() != null)
         user.setCommercialLicense(dto.getCommercialLicense());
+        if(dto.getAddress() != null)
+        user.setAddress(dto.getAddress());
         if(dto.getCommercialRegistry() != null)
         user.setCommercialRegistry(dto.getCommercialRegistry());
         if(dto.getEstablishmentRegistration() != null)
@@ -440,11 +490,10 @@ public class UserService implements IUserService {
             java.util.Date issuedAt = claims.getIssuedAt();
             if (issuedAt != null && !issuedAt.after(user.getLastLogoutAt())) {
                 throw new org.springframework.web.server.ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "Token has been invalidated. Please login again.");
+                        HttpStatus.UNAUTHORIZED, "Token has been invalidated. Please log in again.");
             }
         }
 
         return userId;
     }
-
 }

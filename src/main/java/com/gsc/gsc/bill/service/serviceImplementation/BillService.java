@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.gsc.gsc.constants.NotificationTypes;
 import com.gsc.gsc.utilities.FirebaseMessagingService;
@@ -861,43 +863,124 @@ public class BillService implements IBillService {
                 billNotesRepository.save(billNotes);
             }
 
-            // Clear existing products associated with the bill
-            billProductRepository.deleteAllByBillId(existingBill.getId());
-
             // Save updated bill
             existingBill = billRepository.save(existingBill);
 
-            // Save new products associated with the bill
-            for (int i = 0; i < addBillDTO.getProductBillDTOList().size(); i++) {
-                BillProduct billProduct = new BillProduct();
-                billProduct.setProductId(addBillDTO.getProductBillDTOList().get(i).getProductId());
-                billProduct.setPrice(addBillDTO.getProductBillDTOList().get(i).getPrice());
-                billProduct.setDiscount(addBillDTO.getProductBillDTOList().get(i).getDiscount());
-                billProduct.setQuantity(addBillDTO.getProductBillDTOList().get(i).getQuantity());
-                billProduct.setName(addBillDTO.getProductBillDTOList().get(i).getProductName());
-                billProduct.setBillId(existingBill.getId());
-                billProduct.setCreatedBy(userId);
-                billProductRepository.save(billProduct);
+            // Upsert catalog products — unique key is billId + productId + productManufacturerId
+            if (addBillDTO.getProductBillDTOList() != null && !addBillDTO.getProductBillDTOList().isEmpty()) {
+                // Build a set of (productId, manufacturerId) pairs that are incoming
+                // so we can delete rows that were removed from the list
+                List<BillProduct> existingCatalogProducts = billProductRepository
+                        .findAllByBillId(existingBill.getId())
+                        .map(list -> list.stream()
+                                .filter(bp -> bp.getProductId() != null)
+                                .collect(Collectors.toList()))
+                        .orElse(new ArrayList<>());
+
+                // Pre-resolve all incoming manufacturers so we can build the keep-set
+                List<ProductManufacturer> resolvedManufacturers = new ArrayList<>();
+                for (ProductBillDTO p : addBillDTO.getProductBillDTOList()) {
+                    ProductManufacturer m = null;
+                    if (p.getSellerBrandId() == null) {
+                        m = manufacturerRepository.findFirstByProductIdOrderByQuantityAsc(p.getProductId()).orElse(null);
+                    } else {
+                        m = manufacturerRepository.findBySellerBrandIdAndProductId(p.getSellerBrandId(), p.getProductId()).orElse(null);
+                    }
+                    resolvedManufacturers.add(m);
+                }
+
+                // Delete existing rows whose (productId, manufacturerId) combo is not in the incoming list
+                for (BillProduct existing : existingCatalogProducts) {
+                    boolean keepIt = false;
+                    for (int i = 0; i < addBillDTO.getProductBillDTOList().size(); i++) {
+                        ProductBillDTO p = addBillDTO.getProductBillDTOList().get(i);
+                        ProductManufacturer m = resolvedManufacturers.get(i);
+                        Integer incomingManufacturerId = m != null ? m.getId() : null;
+                        if (Objects.equals(existing.getProductId(), p.getProductId())
+                                && Objects.equals(existing.getProductManufacturerId(), incomingManufacturerId)) {
+                            keepIt = true;
+                            break;
+                        }
+                    }
+                    if (!keepIt) {
+                        billProductRepository.delete(existing);
+                    }
+                }
+
+                // Upsert each incoming product
+                for (int i = 0; i < addBillDTO.getProductBillDTOList().size(); i++) {
+                    ProductBillDTO p = addBillDTO.getProductBillDTOList().get(i);
+                    ProductManufacturer manufacturer = resolvedManufacturers.get(i);
+                    Integer manufacturerId = manufacturer != null ? manufacturer.getId() : null;
+
+                    // Lookup by billId + productId + productManufacturerId
+                    Optional<BillProduct> existingProductOpt;
+                    if (manufacturerId != null) {
+                        existingProductOpt = billProductRepository
+                                .findByBillIdAndProductIdAndProductManufacturerId(
+                                        existingBill.getId(), p.getProductId(), manufacturerId);
+                    } else {
+                        existingProductOpt = billProductRepository
+                                .findByBillIdAndProductId(existingBill.getId(), p.getProductId());
+                    }
+
+                    BillProduct billProduct;
+                    if (existingProductOpt.isPresent()) {
+                        // Update in place — preserve createdBy, customerApprovedAt
+                        billProduct = existingProductOpt.get();
+                        billProduct.setQuantity(p.getQuantity());
+                        billProduct.setName(p.getProductName());
+                        billProduct.setPrice(p.getPrice());
+                        billProduct.setDiscount(p.getDiscount());
+                        billProduct.setProductManufacturerId(manufacturerId);
+                    } else {
+                        // New product — decrement stock
+                        billProduct = new BillProduct();
+                        billProduct.setBillId(existingBill.getId());
+                        billProduct.setProductId(p.getProductId());
+                        billProduct.setQuantity(p.getQuantity());
+                        billProduct.setName(p.getProductName());
+                        billProduct.setPrice(p.getPrice());
+                        billProduct.setDiscount(p.getDiscount());
+                        billProduct.setProductManufacturerId(manufacturerId);
+                        billProduct.setCreatedBy(p.getCreatedBy() != null ? p.getCreatedBy() : userId);
+                        if (manufacturer != null && p.getQuantity() != null && manufacturer.getQuantity() != null) {
+                            manufacturer.setQuantity(manufacturer.getQuantity() - p.getQuantity());
+                            manufacturerRepository.save(manufacturer);
+                        }
+                    }
+
+                    billProductRepository.save(billProduct);
+                }
             }
 
-            for (int i = 0; i < addBillDTO.getOtherProductsDTOList().size(); i++) {
-                BillProduct billProduct = new BillProduct();
-                billProduct.setBillId(existingBill.getId());
-                billProduct.setProductId(null);
-                System.out.println("ProductQuantity : " + addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
-                billProduct.setQuantity(addBillDTO.getOtherProductsDTOList().get(i).getQuantity());
-                billProduct.setPrice(Double.valueOf(addBillDTO.getOtherProductsDTOList().get(i).getPrice()));
-                billProduct.setDiscount(addBillDTO.getOtherProductsDTOList().get(i).getDiscount());
-                billProduct.setName(addBillDTO.getOtherProductsDTOList().get(i).getProductName());
-                billProduct.setCreatedBy(userId);
-                try {
-                    // Your save operation here
-                    billProductRepository.save(billProduct);
-                } catch (Exception e) {
-                    if (e instanceof SQLIntegrityConstraintViolationException) {
-                        SQLIntegrityConstraintViolationException sqlException = (SQLIntegrityConstraintViolationException) e;
-                        System.out.println("SQL Statement causing the exception: " + sqlException.getSQLState());
-                        // Log or print the SQL statement for further analysis
+            // For "other" products (no productId), delete existing ones and recreate
+            if (addBillDTO.getOtherProductsDTOList() != null) {
+                Optional<List<BillProduct>> allExistingOpt = billProductRepository.findAllByBillId(existingBill.getId());
+                if (allExistingOpt.isPresent()) {
+                    for (BillProduct existing : allExistingOpt.get()) {
+                        if (existing.getProductId() == null) {
+                            billProductRepository.delete(existing);
+                        }
+                    }
+                }
+                for (OtherProductDTO op : addBillDTO.getOtherProductsDTOList()) {
+                    BillProduct billProduct = new BillProduct();
+                    billProduct.setBillId(existingBill.getId());
+                    billProduct.setProductId(null);
+                    System.out.println("ProductQuantity : " + op.getQuantity());
+                    billProduct.setQuantity(op.getQuantity());
+                    billProduct.setPrice(Double.valueOf(op.getPrice()));
+                    billProduct.setDiscount(op.getDiscount());
+                    billProduct.setName(op.getProductName());
+                    billProduct.setCreatedBy(userId);
+                    try {
+                        billProductRepository.save(billProduct);
+                    } catch (Exception e) {
+                        if (e instanceof SQLIntegrityConstraintViolationException) {
+                            SQLIntegrityConstraintViolationException sqlException = (SQLIntegrityConstraintViolationException) e;
+                            System.out.println("SQL Statement causing the exception: " + sqlException.getSQLState());
+                        }
                     }
                 }
             }

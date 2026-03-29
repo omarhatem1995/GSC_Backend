@@ -80,6 +80,7 @@ public class BillPdfGeneratorITextService {
     @Autowired private BillProductRepository billProductRepository;
     @Autowired private BillNotesRepository billNotesRepository;
     @Autowired private BillTypeRepository billTypeRepository;
+    @Autowired private PaymentRepository paymentRepository;
 
     // ===================== CONSTANTS =====================
 
@@ -89,6 +90,13 @@ public class BillPdfGeneratorITextService {
     // ===================== MAIN ENTRY POINT =====================
 
     public ReturnObject exportIText2(String token, int billId, String macAddress, Boolean includePrivateNotes) throws IOException {
+        if (token == null || token.trim().isEmpty()) {
+            ReturnObject unauthorized = new ReturnObject();
+            unauthorized.setStatus(false);
+            unauthorized.setMessage("Unauthorized");
+            unauthorized.setData(null);
+            return unauthorized;
+        }
         Integer userId = userService.getUserIdFromToken(token);
         User user = userRepository.findUserById(userId);
         if (includePrivateNotes == null) includePrivateNotes = false;
@@ -122,10 +130,31 @@ public class BillPdfGeneratorITextService {
                 }
             }
 
+            // Compute payment status from the payments table
+            List<Payment> payments = paymentRepository.findByBillId((long) billId);
+            double totalPaid = payments.stream()
+                    .mapToDouble(p -> p.getAmount() != null ? p.getAmount() : 0.0).sum();
+            double billTotal = (bill.getFinalTotalPrice() != null && bill.getFinalTotalPrice() > 0)
+                    ? bill.getFinalTotalPrice()
+                    : (bill.getTotal() != null ? bill.getTotal() : 0.0);
+            String paymentStatusLabel;
+            Color paymentStatusColor;
+            if (totalPaid > 0 && totalPaid >= billTotal) {
+                paymentStatusLabel = "Paid";
+                paymentStatusColor = new DeviceRgb(0, 150, 0);
+            } else if (totalPaid > 0) {
+                paymentStatusLabel = "Partially Paid";
+                paymentStatusColor = new DeviceRgb(230, 120, 0);
+            } else {
+                paymentStatusLabel = "Not Paid";
+                paymentStatusColor = new DeviceRgb(200, 0, 0);
+            }
+
             // customerInfo: [0]=name [1]=address [2]=phone
             // carInfo:      [0]=plateNumber [1]=modelCode [2]=modelYear [3]=brandNameEn
             addInvoiceHeader(document, bill, customerInfo[0], customerInfo[1], customerInfo[2],
-                    carInfo[0], carInfo[1], carInfo[2], carInfo[3], userCreator, billTypeName);
+                    carInfo[0], carInfo[1], carInfo[2], carInfo[3], userCreator, billTypeName,
+                    paymentStatusLabel, paymentStatusColor);
 
             List<BillNotes> billNotes = billNotesRepository.findAllByBillId(billId);
             if (!billNotes.isEmpty()) {
@@ -135,6 +164,12 @@ public class BillPdfGeneratorITextService {
             document.add(new Paragraph(" ").setFontSize(12f));
             Optional<List<BillProduct>> optionalBillProductList = billProductRepository.findAllByBillId(billId);
             document.add(buildProductsTable(optionalBillProductList, bill, user, customerInfo[0], arabicFont));
+
+            // Payments section — shown only when there are payment records
+            if (!payments.isEmpty()) {
+                document.add(new Paragraph(" ").setFontSize(8f));
+                document.add(buildPaymentsTable(payments));
+            }
 
             addJobCardImages(document, jobCardOptional);
             addSignatureSection(document);
@@ -256,9 +291,14 @@ public class BillPdfGeneratorITextService {
     private String[] resolveCreatedByInfo(BillProduct billProduct, User user, String userName) {
         String createdBy = "Admin";
         String approvedByCustomerAt = "Not Yet";
-        if (user != null && billProduct.getCreatedBy() != null) {
-            if (billProduct.getCreatedBy().equals(user.getId())) {
-                createdBy = userName;
+        if (billProduct.getCreatedBy() != null) {
+            // Look up the actual user who added this product — not the token user
+            User addedByUser = userRepository.findUserById(billProduct.getCreatedBy());
+            if (addedByUser != null && addedByUser.getName() != null) {
+                createdBy = addedByUser.getName();
+            }
+            if (addedByUser != null && addedByUser.getAccountTypeId() != null
+                    && addedByUser.getAccountTypeId() == USER_TYPE) {
                 approvedByCustomerAt = "Customer Added it";
             } else if (billProduct.getCustomerApprovedAt() != null) {
                 approvedByCustomerAt = billProduct.getCustomerApprovedAt().toString();
@@ -426,6 +466,48 @@ public class BillPdfGeneratorITextService {
                 .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
     }
 
+    private Table buildPaymentsTable(List<Payment> payments) {
+        // Section title
+        Table paymentsTable = new Table(new float[]{200f, 150f, 200f, 250f}).useAllAvailableWidth();
+
+        // Header row
+        paymentsTable.addCell(new Cell(1, 4)
+                .add(new Paragraph("Payment History").setBold().setFontSize(13f))
+                .setBorder(new SolidBorder(1))
+                .setBackgroundColor(HEADER_BG_COLOR)
+                .setPadding(5));
+
+        // Column headers
+        paymentsTable.addCell(new Cell().add(new Paragraph("#").setBold()).setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
+        paymentsTable.addCell(new Cell().add(new Paragraph("Amount (QAR)").setBold()).setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
+        paymentsTable.addCell(new Cell().add(new Paragraph("Payment Type").setBold()).setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
+        paymentsTable.addCell(new Cell().add(new Paragraph("Paid At").setBold()).setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR));
+
+        // Payment rows
+        double runningTotal = 0;
+        for (int i = 0; i < payments.size(); i++) {
+            Payment payment = payments.get(i);
+            runningTotal += payment.getAmount() != null ? payment.getAmount() : 0.0;
+            String amountStr = payment.getAmount() != null ? String.valueOf(payment.getAmount()) : "-";
+            String typeStr = "Cash";
+            String paidAt = payment.getCreatedAt() != null ? payment.getCreatedAt().toString() : "-";
+
+            paymentsTable.addCell(new Cell().add(new Paragraph(String.valueOf(i + 1))).setBorder(new SolidBorder(1)).setPadding(4));
+            paymentsTable.addCell(new Cell().add(new Paragraph(amountStr)).setBorder(new SolidBorder(1)).setPadding(4));
+            paymentsTable.addCell(new Cell().add(new Paragraph(typeStr)).setBorder(new SolidBorder(1)).setPadding(4));
+            paymentsTable.addCell(new Cell().add(new Paragraph(paidAt)).setBorder(new SolidBorder(1)).setPadding(4));
+        }
+
+        // Total paid row
+        paymentsTable.addCell(new Cell(1, 2).setBorder(Border.NO_BORDER));
+        paymentsTable.addCell(new Cell().add(new Paragraph("Total Paid").setBold())
+                .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR).setPadding(4));
+        paymentsTable.addCell(new Cell().add(new Paragraph(String.valueOf(runningTotal)).setBold())
+                .setBorder(new SolidBorder(1)).setBackgroundColor(HEADER_BG_COLOR).setPadding(4));
+
+        return paymentsTable;
+    }
+
     private String resolveFinalTotal(Bill bill) {
         if (bill.getFinalTotalPrice() != null && bill.getFinalTotalPrice() != 0.0) {
             return BigDecimal.valueOf(bill.getFinalTotalPrice()).toString();
@@ -589,7 +671,8 @@ public class BillPdfGeneratorITextService {
     private void addInvoiceHeader(Document document, Bill bill, String userName,
                                   String address, String phone,
                                   String plateNumber, String modelCode, String modelYear, String brandNameEn,
-                                  User user, String billTypeName) throws IOException {
+                                  User user, String billTypeName,
+                                  String paymentStatusLabel, Color paymentStatusColor) throws IOException {
         InputStream logoStream = getClass().getResourceAsStream("/image/logo2.png");
         if (logoStream == null) throw new IOException("Logo image not found in resources!");
 
@@ -658,8 +741,11 @@ public class BillPdfGeneratorITextService {
 
         customerTable.addCell(createCell("Bill Type", true));
         customerTable.addCell(createCell(billTypeName.isEmpty() ? "-" : billTypeName, false));
-        customerTable.addCell(createCell("", false));
-        customerTable.addCell(createCell("", false));
+        customerTable.addCell(createCell("Payment Status", true));
+        customerTable.addCell(new Cell()
+                .add(new Paragraph(paymentStatusLabel).setBold().setFontColor(paymentStatusColor))
+                .setBorder(new SolidBorder(1))
+                .setPadding(4));
 
         document.add(customerTable);
     }

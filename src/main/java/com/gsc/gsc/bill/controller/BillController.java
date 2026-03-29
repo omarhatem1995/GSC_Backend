@@ -59,7 +59,9 @@ public class BillController {
                 return new ResponseEntity<>(returnObject, HttpStatus.INTERNAL_SERVER_ERROR);
             }
         } else {
-            // If no job card found or PDF generation failed
+            if ("Unauthorized".equals(returnObject.getMessage())) {
+                return new ResponseEntity<>(returnObject, HttpStatus.UNAUTHORIZED);
+            }
             return new ResponseEntity<>(returnObject, HttpStatus.NOT_FOUND);
         }
     }

@@ -66,6 +66,21 @@ public class AdminController {
         return adminService.createAdmin(token, dto);
     }
 
+    @GetMapping("{adminId}")
+    public ResponseEntity<?> getAdminById(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer adminId) {
+        return adminService.getAdminById(token, adminId);
+    }
+
+    @PutMapping("{adminId}")
+    public ResponseEntity<?> updateAdmin(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Integer adminId,
+            @RequestBody CreateAdminDTO dto) {
+        return adminService.updateAdmin(token, adminId, dto);
+    }
+
     @PostMapping("activate_car")
     public ResponseEntity updateCarStats(@RequestHeader("Authorization") String token, @RequestBody ActivateCarDTO activateCarDTO) {
         return adminService.activateCar(token, activateCarDTO);

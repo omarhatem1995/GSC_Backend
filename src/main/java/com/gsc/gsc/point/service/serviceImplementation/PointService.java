@@ -84,10 +84,18 @@ public class PointService {
             notifyCustomerForPoints(user, adminUser.getName(), addPointsDTO.getPoints(), addPointsDTO.getReason());
 
             ReturnObject returnObject = new ReturnObject();
-            if (langId == ENGLISH)
-                returnObject.setMessage("Added " + addPointsDTO.getPoints() + "Points Successfully ");
-            else
-                returnObject.setMessage("تم اضافة " + addPointsDTO.getPoints() + " نقطة بنجاح");
+            boolean isSubtract = Integer.valueOf(2).equals(addPointsDTO.getOperationType());
+            if (langId == ENGLISH) {
+                if (isSubtract)
+                    returnObject.setMessage("Deducted " + addPointsDTO.getPoints() + " Points Successfully");
+                else
+                    returnObject.setMessage("Added " + addPointsDTO.getPoints() + " Points Successfully");
+            } else {
+                if (isSubtract)
+                    returnObject.setMessage("تم خصم " + addPointsDTO.getPoints() + " نقطة بنجاح");
+                else
+                    returnObject.setMessage("تم اضافة " + addPointsDTO.getPoints() + " نقطة بنجاح");
+            }
             returnObject.setStatus(true);
             returnObject.setData(addPointsDTO);
             return ResponseEntity.ok(returnObject);
@@ -145,29 +153,33 @@ public class PointService {
     }
 
     private void notifyCustomerForPoints(User customer, String adminName, Integer points, String reason) {
-        if (customer.getFirebaseToken() == null) return;
+        try {
+            if (customer == null || customer.getFirebaseToken() == null || customer.getFirebaseToken().trim().isEmpty()) return;
 
-        String title = "Points Added by " + adminName;
-        String body  = adminName + " has added " + points + " points to your account.";
-        if (reason != null && !reason.trim().isEmpty()) {
-            body += " Reason: " + reason;
+            String title = "Points Added by " + adminName;
+            String body  = adminName + " has added " + points + " points to your account.";
+            if (reason != null && !reason.trim().isEmpty()) {
+                body += " Reason: " + reason;
+            }
+
+            NotificationMessage notificationMessage = new NotificationMessage();
+            notificationMessage.setTitle(title);
+            notificationMessage.setBody(body);
+            notificationMessage.setData(Map.of("message", body));
+            notificationMessage.setRecToken(customer.getFirebaseToken());
+            String result = firebaseMessagingService.sendNotification(notificationMessage);
+
+            Notification notification = new Notification();
+            notification.setUserId(customer.getId());
+            notification.setTitle(title);
+            notification.setText(body);
+            notification.setReason(reason);
+            notification.setIsSent(!"Failed".equals(result));
+            notification.setNotificationType(NotificationTypes.POINTS);
+            notificationRepository.save(notification);
+        } catch (Exception e) {
+            System.err.println("[FCM] notifyCustomerForPoints failed silently: " + e.getMessage());
         }
-
-        NotificationMessage notificationMessage = new NotificationMessage();
-        notificationMessage.setTitle(title);
-        notificationMessage.setBody(body);
-        notificationMessage.setData(Map.of("message", body));
-        notificationMessage.setRecToken(customer.getFirebaseToken());
-        String result = firebaseMessagingService.sendNotification(notificationMessage);
-
-        Notification notification = new Notification();
-        notification.setUserId(customer.getId());
-        notification.setTitle(title);
-        notification.setText(body);
-        notification.setReason(reason);
-        notification.setIsSent(!"Failed".equals(result));
-        notification.setNotificationType(NotificationTypes.POINTS);
-        notificationRepository.save(notification);
     }
 
     public Integer getUserIdFromToken(String token) {

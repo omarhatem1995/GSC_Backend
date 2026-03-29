@@ -14,22 +14,26 @@ public class FirebaseMessagingService {
     private FirebaseMessaging firebaseMessaging;
 
     public String sendNotification(NotificationMessage notificationMessage){
+        if (notificationMessage.getRecToken() == null || notificationMessage.getRecToken().trim().isEmpty()) {
+            System.out.println("[FCM] Skipped — no device token for this user");
+            return "Skipped";
+        }
+
         Notification notification = Notification.builder()
                 .setTitle(notificationMessage.getTitle())
                 .setBody(notificationMessage.getBody())
                 .setImage(notificationMessage.getImage())
                 .build();
 
-
         Message message = Message.builder().setToken(notificationMessage.getRecToken())
                 .setNotification(notification).putAllData(notificationMessage.getData())
                 .build();
 
-        try{
+        try {
             String messageId = firebaseMessaging.send(message);
             System.out.println("[FCM] Sent successfully | messageId: " + messageId + " | token: " + notificationMessage.getRecToken());
             return messageId;
-        }catch (FirebaseMessagingException e){
+        } catch (FirebaseMessagingException e) {
             System.err.println("[FCM] Send failed | token: " + notificationMessage.getRecToken() + " | error: " + e.getMessagingErrorCode() + " - " + e.getMessage());
             return "Failed";
         }
