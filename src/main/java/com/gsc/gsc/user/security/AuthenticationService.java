@@ -114,10 +114,15 @@ public class AuthenticationService implements UserDetailsService {
         addCookie(jwt , httpRes, tokenExpiryTime);
 
         loginResponseDTO.setToken(jwt);
-        List<PointsDTO> pointsList =  pointRepository.findPointsByUserId(userDetails.getUserId());
+        List<PointsDTO> pointsList = pointRepository.findPointsByUserId(userDetails.getUserId());
         Integer userTotalPoints = 0;
-        for(int i = 0; i<pointsList.size(); i++){
-            userTotalPoints += pointsList.get(i).getPointsNumber();
+        for (int i = 0; i < pointsList.size(); i++) {
+            PointsDTO p = pointsList.get(i);
+            if (Integer.valueOf(2).equals(p.getOperationType())) {
+                userTotalPoints -= p.getPointsNumber();
+            } else {
+                userTotalPoints += p.getPointsNumber();
+            }
         }
         loginResponseDTO.setPoints(userTotalPoints);
 

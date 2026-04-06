@@ -295,7 +295,12 @@ public class BillPdfGeneratorITextService {
             // Look up the actual user who added this product — not the token user
             User addedByUser = userRepository.findUserById(billProduct.getCreatedBy());
             if (addedByUser != null && addedByUser.getName() != null) {
-                createdBy = addedByUser.getName();
+                String name = addedByUser.getName();
+                // Append role label so two people with the same name are distinguishable
+                String roleLabel = addedByUser.getAccountTypeId() != null
+                        ? ACCOUNT_TYPE_MAP.getOrDefault(addedByUser.getAccountTypeId(), "")
+                        : "";
+                createdBy = roleLabel.isEmpty() ? name : name + " (" + roleLabel + ")";
             }
             if (addedByUser != null && addedByUser.getAccountTypeId() != null
                     && addedByUser.getAccountTypeId() == USER_TYPE) {
@@ -523,7 +528,7 @@ public class BillPdfGeneratorITextService {
     private static final float IMG_CELL_HEIGHT = 130f;
     private static final int   IMG_COLS        = 3;
 
-    private void addJobCardImages(Document document, Optional<JobCard> jobCardOptional) throws IOException {
+    private void addJobCardImages(Document document, Optional<JobCard> jobCardOptional) {
         if (!jobCardOptional.isPresent()) return;
 
         List<JobCardImages> jobCardImages = jobCardImagesRepository.findAllByJobCardId(jobCardOptional.get().getId());
@@ -560,8 +565,8 @@ public class BillPdfGeneratorITextService {
                         .setVerticalAlignment(VerticalAlignment.MIDDLE)
                         .setPadding(4f);
 
-            } catch (IOException e) {
-                // Placeholder cell if image fails to load
+            } catch (Exception e) {
+                // Placeholder cell if image fails to load (catches both java.io.IOException and com.itextpdf.io.IOException)
                 System.out.println("Failed to load image: " + jobCardImage.getUrl() + " — " + e.getMessage());
                 imageCell = new Cell()
                         .add(new Paragraph("Image unavailable").setFontSize(9f)

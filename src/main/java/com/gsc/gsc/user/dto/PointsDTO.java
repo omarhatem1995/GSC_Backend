@@ -19,6 +19,7 @@ public class PointsDTO {
     private String reason;
     private String createdBy;
     private int pointsNumber;
+    private Integer operationType;
     private String createdAt;
     private String updatedAt;
 }

@@ -985,9 +985,20 @@ public class JobCardService {
 
                     // Replace free-text other products only when the list is provided and non-empty
                     if (jobCardsDTO.getOtherProductsDTOList() != null && !jobCardsDTO.getOtherProductsDTOList().isEmpty()) {
+                        // Preserve original createdBy keyed by name before deleting
+                        Map<String, Integer> existingCreatedByMap = new java.util.HashMap<>();
+                        for (JobCardProduct existing : jobCardProductRepository.findAllByJobCardIdAndProductIdIsNull(existingJobCard.getId())) {
+                            if (existing.getName() != null) {
+                                existingCreatedByMap.put(existing.getName(), existing.getCreatedBy());
+                            }
+                        }
                         jobCardProductRepository.deleteAllByJobCardIdAndProductIdIsNull(existingJobCard.getId());
                         for (OtherProductDTO otherProductDTO : jobCardsDTO.getOtherProductsDTOList()) {
                             JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, existingJobCard.getId(), userId);
+                            Integer originalCreatedBy = existingCreatedByMap.get(otherProductDTO.getProductName());
+                            if (originalCreatedBy != null) {
+                                jobCardProduct.setCreatedBy(originalCreatedBy);
+                            }
                             jobCardProductRepository.save(jobCardProduct);
                         }
                     }
@@ -1015,8 +1026,9 @@ public class JobCardService {
                             Integer manufacturerId = productManufacturerRepository
                                     .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
                                     .map(pm -> pm.getId()).orElse(null);
-                            Optional<JobCardProduct> existingProductOpt = jobCardProductRepository
-                                    .findByJobCardIdAndProductId(existingJobCard.getId(), productBillDTO.getId());
+                            Optional<JobCardProduct> existingProductOpt = manufacturerId != null
+                                    ? jobCardProductRepository.findByJobCardIdAndProductIdAndManufacturerId(existingJobCard.getId(), productBillDTO.getId(), manufacturerId)
+                                    : jobCardProductRepository.findByJobCardIdAndProductId(existingJobCard.getId(), productBillDTO.getId());
                             JobCardProduct jobCardProduct;
                             if (existingProductOpt.isPresent()) {
                                 // Update in place — preserve id, createdBy, customerApprovedAt
@@ -1215,9 +1227,20 @@ public class JobCardService {
                             }
                             // Replace free-text other products only when the list is provided and non-empty
                             if (jobCardsDTO.getOtherProductsDTOList() != null && !jobCardsDTO.getOtherProductsDTOList().isEmpty()) {
+                                // Preserve original createdBy keyed by name before deleting
+                                Map<String, Integer> existingCreatedByMap = new java.util.HashMap<>();
+                                for (JobCardProduct existing : jobCardProductRepository.findAllByJobCardIdAndProductIdIsNull(existingJobCard.getId())) {
+                                    if (existing.getName() != null) {
+                                        existingCreatedByMap.put(existing.getName(), existing.getCreatedBy());
+                                    }
+                                }
                                 jobCardProductRepository.deleteAllByJobCardIdAndProductIdIsNull(existingJobCard.getId());
                                 for (OtherProductDTO otherProductDTO : jobCardsDTO.getOtherProductsDTOList()) {
                                     JobCardProduct jobCardProduct = new JobCardProduct(otherProductDTO, existingJobCard.getId(), userId);
+                                    Integer originalCreatedBy = existingCreatedByMap.get(otherProductDTO.getProductName());
+                                    if (originalCreatedBy != null) {
+                                        jobCardProduct.setCreatedBy(originalCreatedBy);
+                                    }
                                     jobCardProductRepository.save(jobCardProduct);
                                 }
                             }
@@ -1244,8 +1267,9 @@ public class JobCardService {
                                     Integer manufacturerId = productManufacturerRepository
                                             .findBySellerBrandIdAndProductId(productBillDTO.getSellerBrandId(), productBillDTO.getId())
                                             .map(pm -> pm.getId()).orElse(null);
-                                    Optional<JobCardProduct> existingProductOpt = jobCardProductRepository
-                                            .findByJobCardIdAndProductId(existingJobCard.getId(), productBillDTO.getId());
+                                    Optional<JobCardProduct> existingProductOpt = manufacturerId != null
+                                            ? jobCardProductRepository.findByJobCardIdAndProductIdAndManufacturerId(existingJobCard.getId(), productBillDTO.getId(), manufacturerId)
+                                            : jobCardProductRepository.findByJobCardIdAndProductId(existingJobCard.getId(), productBillDTO.getId());
                                     JobCardProduct jobCardProduct;
                                     if (existingProductOpt.isPresent()) {
                                         // Update in place — preserve id, createdBy, customerApprovedAt

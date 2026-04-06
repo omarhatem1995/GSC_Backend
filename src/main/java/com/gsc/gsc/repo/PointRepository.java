@@ -10,16 +10,16 @@ import java.util.List;
 
 public interface PointRepository extends JpaRepository<Point, Integer> {
     @Query("SELECT NEW com.gsc.gsc.user.dto.PointsDTO(p.id, p.code, p.userId, p.reason, " +
-            "u.name, p.pointsNumber, p.createdAt, p.updatedAt) " +
+            "u.name, p.pointsNumber, p.operationType, p.createdAt, p.updatedAt) " +
             "FROM Point p JOIN User u ON p.userId = u.id " +
             "WHERE p.userId = :userId")
     List<PointsDTO> findPointsByUserId(@Param("userId") Integer userId);
 
     List<Point> findAllByUserId(Integer userId);
 
-    @Query("SELECT COALESCE(SUM(p.pointsNumber), 0) FROM Point p WHERE p.createdBy = :adminId AND p.userId = :userId")
+    @Query("SELECT COALESCE(SUM(CASE WHEN p.operationType = 2 THEN -p.pointsNumber ELSE p.pointsNumber END), 0) FROM Point p WHERE p.createdBy = :adminId AND p.userId = :userId")
     Integer sumPointsGivenByAdminToUser(@Param("adminId") Integer adminId, @Param("userId") Integer userId);
 
-    @Query("SELECT COALESCE(SUM(p.pointsNumber), 0) FROM Point p WHERE p.userId = :userId")
+    @Query("SELECT COALESCE(SUM(CASE WHEN p.operationType = 2 THEN -p.pointsNumber ELSE p.pointsNumber END), 0) FROM Point p WHERE p.userId = :userId")
     Integer sumPointsByUserId(@Param("userId") Integer userId);
 }

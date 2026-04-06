@@ -88,8 +88,13 @@ public class UserService implements IUserService {
             List<PointsDTO> pointsDTO = pointRepository.findPointsByUserId(userId);
             Integer total = 0;
             getPointsDTO.setPointsDTO(pointsDTO);
-            for(int i=0;i<pointsDTO.size();i++){
-                total += pointsDTO.get(i).getPointsNumber();
+            for (int i = 0; i < pointsDTO.size(); i++) {
+                PointsDTO p = pointsDTO.get(i);
+                if (Integer.valueOf(2).equals(p.getOperationType())) {
+                    total -= p.getPointsNumber();
+                } else {
+                    total += p.getPointsNumber();
+                }
             }
             getPointsDTO.setTotalPoints(total);
             returnObject.setData(getPointsDTO);

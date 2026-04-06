@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import java.awt.*;
 import java.io.IOException;
+import java.util.TimeZone;
 
 @SpringBootApplication
 @EnableTransactionManagement
@@ -30,6 +31,7 @@ public class GscApplication {
     }
 
     public static void main(String[] args) {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Qatar"));
         SpringApplication.run(GscApplication.class, args);
         try {
             Font font =  FontLoader.loadArabicFont();

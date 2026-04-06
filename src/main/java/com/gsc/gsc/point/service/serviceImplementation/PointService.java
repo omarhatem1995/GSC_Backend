@@ -64,12 +64,16 @@ public class PointService {
 
         User user = userRepository.findUserById(userId);
         if (user != null) {
-            // Guard: prevent total points from going negative
-            if (addPointsDTO.getPoints() < 0) {
+            // Guard: prevent total points from going negative on deduct (operationType = 2)
+            if (Integer.valueOf(2).equals(addPointsDTO.getOperationType())) {
                 Integer currentTotal = pointRepository.sumPointsByUserId(userId);
-                if (currentTotal + addPointsDTO.getPoints() < 0) {
+                if (currentTotal < addPointsDTO.getPoints()) {
                     ReturnObject returnObject = new ReturnObject();
-                    returnObject.setMessage("Insufficient points. User only has " + currentTotal + " points.");
+                    if (langId == ENGLISH) {
+                        returnObject.setMessage("Can't deduct this amount. User only has " + currentTotal + " points.");
+                    } else {
+                        returnObject.setMessage("لا يمكن خصم هذا المبلغ. رصيد المستخدم " + currentTotal + " نقطة فقط.");
+                    }
                     returnObject.setStatus(false);
                     returnObject.setData(null);
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);

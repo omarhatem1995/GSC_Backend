@@ -549,7 +549,9 @@ public class AdminService implements IAdminService {
         AdminPermission permissions = adminPermissionRepository.findByAdminId(adminId).orElse(null);
 
         Map<String, Object> data = new HashMap<>();
-        data.put("admin", admin);
+        data.put("name", admin.getName());
+        data.put("phone", admin.getPhone());
+        data.put("mail", admin.getMail());
         data.put("permissions", permissions);
 
         returnObject.setStatus(true);

@@ -26,7 +26,7 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     Optional<User> findOptionalByPhoneAndMail(String phone, String mail);
 
-    @Query("SELECT new com.gsc.gsc.user.dto.GetAllUsers(u, SUM(p.pointsNumber)) FROM User u LEFT JOIN Point p ON u.id = p.userId WHERE u.accountTypeId <> 2 GROUP BY u.id")
+    @Query("SELECT new com.gsc.gsc.user.dto.GetAllUsers(u, SUM(CASE WHEN p.operationType = 2 THEN -p.pointsNumber ELSE COALESCE(p.pointsNumber, 0) END)) FROM User u LEFT JOIN Point p ON u.id = p.userId WHERE u.accountTypeId <> 2 GROUP BY u.id")
     List<GetAllUsers> findAllExceptAdmins();
 
     @Query("select new com.gsc.gsc.user.dto.LoginResponseDTO(u) from User u where u.id = ?1")

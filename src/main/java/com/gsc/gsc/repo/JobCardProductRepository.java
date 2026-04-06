@@ -12,7 +12,9 @@ public interface JobCardProductRepository extends JpaRepository<JobCardProduct, 
     Optional<List<JobCardProduct>> findAllByJobCardId(Integer jobCardId);
     Optional<List<JobCardProduct>> findAllByJobCardIdAndCustomerApprovedAt(Integer jobCardId, Timestamp customerApprovedAt);
     List<JobCardProduct> findAllByJobCardIdAndProductIdIsNotNull(Integer jobCardId);
+    List<JobCardProduct> findAllByJobCardIdAndProductIdIsNull(Integer jobCardId);
     Optional<JobCardProduct> findByJobCardIdAndProductId(Integer jobCardId, Integer productId);
+    Optional<JobCardProduct> findByJobCardIdAndProductIdAndManufacturerId(Integer jobCardId, Integer productId, Integer manufacturerId);
 
     @Transactional
     void deleteAllByJobCardId(Integer jobCardId);

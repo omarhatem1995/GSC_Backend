@@ -405,9 +405,17 @@ public class CarService implements ICarService {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(returnObject);
             }else {
                 Car car = carOptional.get();
-                car.setIsActivated((byte) 1);
-                carRepository.save(car);
-                returnObject.setMessage("Cars Approved Successfully");
+                if (car.getIsActivated() != null && car.getIsActivated() == 1) {
+                    // Currently active → set back to pending
+                    car.setIsActivated((byte) 0);
+                    carRepository.save(car);
+                    returnObject.setMessage("Car set to Pending Successfully");
+                } else {
+                    // Currently pending (or null) → approve / activate
+                    car.setIsActivated((byte) 1);
+                    carRepository.save(car);
+                    returnObject.setMessage("Car Approved Successfully");
+                }
                 returnObject.setData(car);
                 returnObject.setStatus(true);
                 return ResponseEntity.ok(returnObject);
